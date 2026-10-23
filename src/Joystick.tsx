@@ -53,7 +53,7 @@ export default function Joystick({ onMove, label }: { onMove: (x: number, y: num
       <span className="joystick-ring" />
       <span
         className="joystick-knob"
-        style={{ transform: `translate(calc(-50% + ${knob.x * 34}px), calc(-50% + ${knob.y * 34}px))` }}
+        style={{ transform: `translate(calc(-50% + ${knob.x} * var(--travel)), calc(-50% + ${knob.y} * var(--travel)))` }}
       />
     </div>
   );

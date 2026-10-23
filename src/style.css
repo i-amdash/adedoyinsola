@@ -2747,3 +2747,41 @@ button:disabled { cursor: not-allowed; opacity: .5; }
     font-size: 10px;
   }
 }
+
+/* Smaller touch controls (v5) */
+@media (max-width: 1100px), (pointer: coarse) {
+  .joystick {
+    width: 96px;
+    height: 96px;
+    --travel: 26px;
+  }
+  .joystick-ring {
+    inset: 14px;
+  }
+  .joystick-knob {
+    width: 40px;
+    height: 40px;
+  }
+  .touch-controls {
+    gap: 10px;
+  }
+  .touch-controls .touch-brake {
+    height: 34px;
+    padding: 0 12px;
+    margin-bottom: 4px;
+    border-radius: 17px;
+    font-size: 9px !important;
+    letter-spacing: 1.5px;
+  }
+}
+@media (max-width: 600px) {
+  .joystick {
+    width: 88px;
+    height: 88px;
+    --travel: 24px;
+  }
+  .joystick-knob {
+    width: 36px;
+    height: 36px;
+  }
+}

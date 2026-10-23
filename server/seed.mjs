@@ -215,7 +215,7 @@ export const seed = {
   world: {
     title: "Your vision.\nBrought to life.",
     subtitle:
-      "You bring the idea. I bring it to life as a website, online store, custom platform, or mobile app—made to earn trust and win customers. Your vision, with care in every detail.",
+      "You bring the idea. I bring it to life as a website, online store, custom platform, or mobile app.",
     welcome: "From your vision to a working product",
     district: "Palm Avenue",
     accent: "#c5ed8b",

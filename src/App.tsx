@@ -329,7 +329,7 @@ export default function App() {
             </p>
             <p className="hero-description">
               {content?.world.subtitle ||
-                "You bring the idea. I bring it to life as a website, online store, custom platform, or mobile app—made to earn trust and win customers. Your vision, with care in every detail."}
+                "You bring the idea. I bring it to life as a website, online store, custom platform, or mobile app."}
             </p>
             <div className="hero-actions">
               <button className="primary-button" onClick={() => setPanel("contact")}>
