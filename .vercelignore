@@ -1,0 +1,8 @@
+.env*
+!.env.example
+work/
+data/
+tests/
+.agents/
+node_modules/
+supabase/

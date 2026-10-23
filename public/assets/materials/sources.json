@@ -1,0 +1,17 @@
+{
+  "asphalt": {
+    "asset": "asphalt_02",
+    "source": "https://polyhaven.com/a/asphalt_02",
+    "license": "CC0"
+  },
+  "plaster": {
+    "asset": "clay_plaster",
+    "source": "https://polyhaven.com/a/clay_plaster",
+    "license": "CC0"
+  },
+  "paving": {
+    "asset": "concrete_pavers",
+    "source": "https://polyhaven.com/a/concrete_pavers",
+    "license": "CC0"
+  }
+}

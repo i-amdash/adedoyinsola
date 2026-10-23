@@ -1,0 +1,35 @@
+Car Concept
+Model and textures: Eric Chadwick, Darmstadt Graphics Group GmbH, 2024.
+License: Creative Commons Attribution 4.0 International.
+https://creativecommons.org/licenses/by/4.0/
+Source: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CarConcept
+Local file: car-concept.glb
+Changes: runtime paint color/material adjustment, scale, orientation, wheel rotation.
+The source asset includes Khronos and 3D Commerce logos. Their presence does not imply endorsement.
+
+Environment, procedural fallback vehicles, human figure, and project-cover illustrations:
+Created for this portfolio in source code.
+
+Fonts: DM Sans and Manrope, via Google Fonts. SIL Open Font License.
+Font license files are included in public/fonts/.
+
+Palm Avenue materials and lighting:
+- asphalt_02, clay_plaster, concrete_pavers: Poly Haven, CC0.
+https://polyhaven.com/license
+https://polyhaven.com/a/asphalt_02
+https://polyhaven.com/a/clay_plaster
+https://polyhaven.com/a/concrete_pavers
+Maps downloaded at 1K and stored locally.
+
+People (player and pedestrians):
+Microsoft Rocketbox Avatar Library and its animation library, MIT License, Copyright (c) 2020 Microsoft.
+https://github.com/microsoft/Microsoft-Rocketbox
+Avatars: Male_Adult_12 (player), Male_Adult_18, Male_Adult_04, Male_Adult_06, Female_Adult_10, Female_Adult_06,
+Female_Adult_12, Female_Adult_08. Clips: idle_neutral_01/02, idle_look_around_01, walk_neutral_01, run_neutral_01, wave_01.
+Changes: FBX converted to GLB (FBX2glTF), TGA textures resized to 1024/512 px JPEG/PNG, walk/run made in place,
+skin tone adjusted on four avatars. The MIT licence text is in people/LICENSE-Rocketbox.md.
+
+Procedural (created in code for this portfolio): the whole neighbourhood (blocks of flats, duplexes,
+bungalows, shops, signs, walls, gates, tanks, kiosks), all trees and grass, laterite, block and screen-wall
+textures, minibuses, tricycles, saloons and SUVs, street lamps, skyline, sky, clouds, stars, lens flare,
+dust, tyre smoke, skid marks and all sound. Shop and business names are fictional.

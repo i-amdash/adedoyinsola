@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+data/content.json
+data/*.tmp
+*.log
+.DS_Store
+
+work/
+*.tsbuildinfo
+
+data/players.json
+
+data/uploads/
