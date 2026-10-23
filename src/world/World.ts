@@ -45,6 +45,8 @@ export class World {
   manager = new THREE.LoadingManager();
   clock = new THREE.Clock();
   keys = new Set<string>();
+  /** Analog stick from the touch joystick: x right, y down, each -1..1. */
+  stick = { x: 0, y: 0 };
   car = new THREE.Group();
   carBody = new THREE.Group();
   driver?: THREE.Group;
@@ -383,9 +385,13 @@ export class World {
       if (k === "r") this.reset();
     };
     const keyup = (e: KeyboardEvent) => this.keys.delete(e.key.toLowerCase());
-    const blur = () => this.keys.clear();
+    const blur = () => {
+      this.keys.clear();
+      this.setStick(0, 0);
+    };
     const visibility = () => {
       this.keys.clear();
+      this.setStick(0, 0);
       this.clock.getDelta();
     };
     window.addEventListener("keydown", down);
@@ -472,6 +478,12 @@ export class World {
     this.orbit = 0;
     this.race = "idle";
     this.gate.visible = false;
+  }
+  setStick(x: number, y: number) {
+    const m = Math.hypot(x, y);
+    const k = m > 1 ? 1 / m : 1;
+    this.stick.x = x * k;
+    this.stick.y = y * k;
   }
   toggleMode() {
     if (this.race === "countdown" || this.race === "running") {
@@ -607,10 +619,13 @@ export class World {
   }
   drive(dt: number) {
     const k = this.keys;
-    const fwdKey = k.has("w") || k.has("arrowup"),
-      backKey = k.has("s") || k.has("arrowdown"),
-      left = k.has("a") || k.has("arrowleft"),
-      right = k.has("d") || k.has("arrowright"),
+    const dead = (v: number) => (Math.abs(v) < 0.15 ? 0 : (v - Math.sign(v) * 0.15) / 0.85);
+    const sx = dead(this.stick.x),
+      sy = dead(this.stick.y);
+    const fwd = Math.max(k.has("w") || k.has("arrowup") ? 1 : 0, -sy),
+      back = Math.max(k.has("s") || k.has("arrowdown") ? 1 : 0, sy),
+      fwdKey = fwd > 0,
+      backKey = back > 0,
       handbrake = k.has(" ");
     const f = new V(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     const r = new V(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
@@ -624,20 +639,21 @@ export class World {
         vF = Math.min(0, vF + 30 * dt);
         this.braking = true;
       } else {
-        vF += 12.5 * (1 - Math.max(0, vF) / max) * dt;
-        this.throttle = 1;
+        vF += 12.5 * fwd * (1 - Math.max(0, vF) / max) * dt;
+        this.throttle = fwd;
       }
     } else if (backKey) {
       if (vF > 0.5) {
-        vF = Math.max(0, vF - 30 * dt);
+        vF = Math.max(0, vF - 30 * back * dt);
         this.braking = true;
-      } else vF = Math.max(-9, vF - 7 * dt);
+      } else vF = Math.max(-9 * back, vF - 7 * back * dt);
     } else vF -= vF * 0.32 * dt + Math.sign(vF) * Math.min(Math.abs(vF), 0.8 * dt);
     if (handbrake) {
       vF -= vF * 1.1 * dt;
       this.braking = true;
     }
-    const steerInput = (left ? 1 : 0) - (right ? 1 : 0);
+    const keySteer = (k.has("a") || k.has("arrowleft") ? 1 : 0) - (k.has("d") || k.has("arrowright") ? 1 : 0);
+    const steerInput = keySteer || -sx;
     this.steer = damp(this.steer, steerInput, steerInput ? 6 : 9, dt);
     const speed = Math.abs(vF);
     const maxAngle = THREE.MathUtils.lerp(0.62, 0.17, Math.min(1, speed / 30));
@@ -697,9 +713,19 @@ export class World {
 
   walk(dt: number) {
     const k = this.keys;
-    const ix = Number(k.has("d") || k.has("arrowright")) - Number(k.has("a") || k.has("arrowleft")),
+    let ix = Number(k.has("d") || k.has("arrowright")) - Number(k.has("a") || k.has("arrowleft")),
       iz = Number(k.has("s") || k.has("arrowdown")) - Number(k.has("w") || k.has("arrowup"));
-    walkingVelocity(this.walkVelocity, ix, iz, this.camHeading + this.orbit, k.has("shift"), dt);
+    let sprint = k.has("shift"),
+      amount = 1;
+    const push = Math.hypot(this.stick.x, this.stick.y);
+    if (!ix && !iz && push > 0.15) {
+      // Analog stick: direction from the thumb, a gentle push walks, a full push runs.
+      ix = this.stick.x;
+      iz = this.stick.y;
+      sprint = push > 0.88;
+      amount = sprint ? 1 : Math.max(0.35, (push - 0.15) / 0.73);
+    }
+    walkingVelocity(this.walkVelocity, ix, iz, this.camHeading + this.orbit, sprint, dt, amount);
     const previousSpeed = this.walkSpeed;
     const candidate = new V();
     this.walkSpeed = moveWalker(this.walkPos, this.walkVelocity, dt, (p) => {

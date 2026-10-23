@@ -29,6 +29,7 @@ import {
 import type { World } from "./world/World";
 import type { Quality, TimeOfDay } from "./world/Atmosphere";
 import Radar from "./Radar";
+import Joystick from "./Joystick";
 import {
   destinations,
   type Content,
@@ -433,39 +434,26 @@ export default function App() {
                 <kbd>F</kbd>
               </button>
             </div>
-            <div
-              className="touch-controls"
-              aria-label="Touch movement controls"
-            >
-              {[
-                ["a", "←"],
-                ["w", "↑"],
-                ["s", "↓"],
-                ["d", "→"],
-                [" ", "Brake"],
-              ].map(([key, label]) => (
+            <div className="touch-controls">
+              <Joystick
+                label={telemetry.mode === "drive" ? "Drive: push up to accelerate, down to brake or reverse, sideways to steer" : "Walk: push in any direction, push fully to run"}
+                onMove={(x, y) => world.current?.setStick(x, y)}
+              />
+              {telemetry.mode === "drive" && (
                 <button
-                  key={key}
-                  aria-label={
-                    {
-                      a: "Turn left",
-                      w: "Move forward",
-                      s: "Move backward",
-                      d: "Turn right",
-                      " ": "Brake or handbrake",
-                    }[key]
-                  }
+                  className="touch-brake"
+                  aria-label="Handbrake"
                   onPointerDown={(e) => {
                     e.currentTarget.setPointerCapture(e.pointerId);
-                    touchKey(key, true);
+                    touchKey(" ", true);
                   }}
-                  onPointerUp={() => touchKey(key, false)}
-                  onPointerCancel={() => touchKey(key, false)}
-                  onLostPointerCapture={() => touchKey(key, false)}
+                  onPointerUp={() => touchKey(" ", false)}
+                  onPointerCancel={() => touchKey(" ", false)}
+                  onLostPointerCapture={() => touchKey(" ", false)}
                 >
-                  {label}
+                  Brake
                 </button>
-              ))}
+              )}
             </div>
           </>
         )}

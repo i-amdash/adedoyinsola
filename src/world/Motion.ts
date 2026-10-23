@@ -29,9 +29,9 @@ export class WheelRig {
 
 export type Planar = { x: number; z: number };
 /** Camera-relative velocity, independent of the avatar's visual turn. */
-export function walkingVelocity(velocity: Planar, ix: number, iz: number, heading: number, sprint: boolean, dt: number) {
+export function walkingVelocity(velocity: Planar, ix: number, iz: number, heading: number, sprint: boolean, dt: number, amount = 1) {
   const length = Math.hypot(ix, iz);
-  const speed = length ? (sprint ? 4.1 : 1.4) / length : 0;
+  const speed = length ? ((sprint ? 4.1 : 1.4) * Math.min(1, Math.max(0, amount))) / length : 0;
   const x = (Math.cos(heading) * ix + Math.sin(heading) * iz) * speed;
   const z = (-Math.sin(heading) * ix + Math.cos(heading) * iz) * speed;
   const reversing = x * velocity.x + z * velocity.z < 0;

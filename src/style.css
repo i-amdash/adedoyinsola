@@ -2637,3 +2637,113 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .project-art.has-poster > img.project-cover { opacity: 0; transition: opacity .45s ease; }
 .project-art.has-poster.is-ready > img.project-cover { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .project-art.has-poster > img.project-cover { transition: none; } }
+
+/* ---------- Touch controls v4: analog stick bottom-left, map top-right ---------- */
+.joystick,
+.touch-brake {
+  display: none;
+}
+@media (max-width: 1100px), (pointer: coarse) {
+  .touch-controls {
+    position: absolute;
+    left: 25px;
+    bottom: 70px;
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    pointer-events: auto;
+    z-index: 3;
+  }
+  .joystick {
+    display: block;
+    position: relative;
+    width: 128px;
+    height: 128px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #1b3026cc 0 56%, #1b302699 57%);
+    border: 1px solid #d6dfc655;
+    backdrop-filter: blur(8px);
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .joystick-ring {
+    position: absolute;
+    inset: 18px;
+    border-radius: 50%;
+    border: 1px dashed #d6dfc644;
+    pointer-events: none;
+  }
+  .joystick-knob {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: var(--accent, #c5ed8b);
+    box-shadow: 0 6px 18px #0007, inset 0 -3px 0 #0003;
+    transform: translate(-50%, -50%);
+    transition: transform 0.14s ease-out;
+    pointer-events: none;
+  }
+  .joystick.is-active .joystick-knob {
+    transition: none;
+  }
+  .touch-controls .touch-brake {
+    display: block;
+    height: 52px;
+    padding: 0 18px;
+    margin-bottom: 6px;
+    border-radius: 26px;
+    border: 1px solid #d6dfc655;
+    background: #1b3026cc;
+    backdrop-filter: blur(8px);
+    color: #e5eed8;
+    font-size: 11px !important;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    touch-action: none;
+    user-select: none;
+  }
+  .touch-controls .touch-brake:active {
+    background: #789958;
+  }
+  /* The map moves to the top right so the stick can own the bottom left. */
+  .bottom-left {
+    left: auto;
+    right: 23px;
+    bottom: auto;
+    top: 84px;
+  }
+  .controls-hint,
+  .speedometer kbd {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .bottom-left {
+    top: 76px;
+  }
+  .radar-wrap {
+    width: 128px;
+  }
+  .radar {
+    height: 90px;
+  }
+  .playing-label {
+    display: none;
+  }
+  .toast {
+    top: 190px;
+  }
+  .touch-controls {
+    left: 20px;
+    bottom: 64px;
+  }
+  .speedometer button span {
+    display: inline;
+    font-size: 10px;
+  }
+}

@@ -36,7 +36,8 @@ export const seed = {
         "Payments"
       ],
       "url": "",
-      "image": "",
+      "image": "/project-covers/landmark-citizen-app.gif",
+      "poster": "/project-covers/landmark-citizen-app.jpg",
       "featured": true
     },
     {
@@ -206,7 +207,8 @@ export const seed = {
         "SaaS"
       ],
       "url": "https://digital-administration.vercel.app/",
-      "image": "",
+      "image": "/project-covers/digital-administration.gif",
+      "poster": "/project-covers/digital-administration.jpg",
       "featured": false
     }
   ],
