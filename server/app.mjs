@@ -30,7 +30,7 @@ export function createApp({
     if (production)
       res.set(
         "Content-Security-Policy",
-        `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; connect-src 'self' ${supabase ? new URL(supabase.supabaseUrl).origin : ''}; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'`,
+        `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; connect-src 'self' blob: data: ${supabase ? new URL(supabase.supabaseUrl).origin : ''}; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'`,
       );
     next();
   });
