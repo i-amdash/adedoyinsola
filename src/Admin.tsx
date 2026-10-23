@@ -145,7 +145,7 @@ export default function Admin() {
     edit((c) => ({
       ...c,
       projects: c.projects.map((p) =>
-        p.id === id ? { ...p, [key]: value } : p,
+        p.id === id ? { ...p, [key]: value, ...(key === "image" ? { poster: "" } : {}) } : p,
       ),
     }));
   }

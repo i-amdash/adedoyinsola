@@ -9,6 +9,8 @@ const link = z.union([
   z.literal(""),
   z.url().refine((v) => /^https?:\/\//i.test(v), "Use an http or https URL"),
 ]);
+const staticCover = /^\/project-covers\/[a-z0-9-]+\.(png|jpg|gif|webp)$/;
+const coverImage = z.union([link, z.string().regex(uploadPath), z.string().regex(staticCover)], { error: "Use an uploaded image or an http/https image URL" });
 export const contentSchema = z.object({
   revision: z.number().int().positive(),
   profile: z.object({
@@ -41,7 +43,8 @@ export const contentSchema = z.object({
         description: text,
         stack: z.array(text.max(60)).max(20),
         url: link,
-        image: z.union([link, z.string().regex(uploadPath, "Use an uploaded image or an http/https image URL")]),
+        image: coverImage,
+        poster: coverImage.optional().default(""),
         featured: z.boolean(),
       }),
     )

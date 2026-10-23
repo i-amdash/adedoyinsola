@@ -6,6 +6,7 @@ export type Project = {
   stack: string[];
   url: string;
   image: string;
+  poster?: string;
   featured: boolean;
 };
 export type Content = {

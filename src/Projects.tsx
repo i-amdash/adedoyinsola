@@ -3,14 +3,21 @@ import { ArrowUpRight, ChevronLeft, ChevronRight, Smartphone, Monitor, Layers } 
 import type { Project } from "./types";
 function Artwork({ p, i }: { p: Project; i: number }) {
   const [failed, setFailed] = useState(false);
-  return (                              <div className={`project-art art-${i % 3}`}>
+  const [ready, setReady] = useState(false);
+  const poster = p.poster && p.poster !== p.image ? p.poster : "";
+  return (                              <div className={`project-art art-${i % 3}${poster ? " has-poster" : ""}${ready ? " is-ready" : ""}`}>
                                 {p.image && !failed ? (
-                                  <img
-                                    src={p.image}
-                                    decoding="async"
-                                    alt={`${p.title} preview`}
-                                    onError={() => setFailed(true)}
-                                  />
+                                  <>
+                                    {poster && <img className="project-poster" src={poster} decoding="async" alt="" aria-hidden="true" />}
+                                    <img
+                                      className="project-cover"
+                                      src={p.image}
+                                      decoding="async"
+                                      alt={`${p.title} preview`}
+                                      onLoad={() => setReady(true)}
+                                      onError={() => setFailed(true)}
+                                    />
+                                  </>
                                 ) : (
                                   <>
                                     <div className="project-visual">

@@ -40,18 +40,17 @@ export const seed = {
       "featured": true
     },
     {
-      "id": "digital-administration",
-      "title": "Digital Administration",
-      "category": "Web application",
-      "description": "A web platform for managing government agencies and their day-to-day operations. Built with Next.js and Tailwind CSS.",
+      "id": "triple-a-book-club",
+      "title": "Triple A Book Club",
+      "category": "Community & membership platform",
+      "description": "A home for a growing reading community that reads one fiction book every month and one non-fiction book every two months, then meets to discuss them. Members can browse current and past reads, vote on upcoming picks, explore the gallery and meet fellow readers, with member sign-in. Built with Next.js and Tailwind CSS.",
       "stack": [
         "Next.js",
-        "React",
-        "Tailwind CSS",
-        "SaaS"
+        "Tailwind CSS"
       ],
-      "url": "https://digital-administration.vercel.app/",
-      "image": "",
+      "url": "https://www.tripleabookclub.com/",
+      "image": "/project-covers/triple-a-book-club.gif",
+      "poster": "/project-covers/triple-a-book-club.jpg",
       "featured": true
     },
     {
@@ -67,7 +66,8 @@ export const seed = {
         "Interactive 3D"
       ],
       "url": "https://www.oandbapparels.com/",
-      "image": "",
+      "image": "/project-covers/onb-apparels.gif",
+      "poster": "/project-covers/onb-apparels.jpg",
       "featured": true
     },
     {
@@ -80,7 +80,8 @@ export const seed = {
         "Tailwind CSS"
       ],
       "url": "https://www.terratoraconsulting.com/",
-      "image": "",
+      "image": "/project-covers/terratora-consulting.gif",
+      "poster": "/project-covers/terratora-consulting.jpg",
       "featured": false
     },
     {
@@ -93,7 +94,8 @@ export const seed = {
         "Tailwind CSS"
       ],
       "url": "https://www.paulonwuanibe.com/",
-      "image": "",
+      "image": "/project-covers/paul-onwuanibe.gif",
+      "poster": "/project-covers/paul-onwuanibe.jpg",
       "featured": false
     },
     {
@@ -108,7 +110,8 @@ export const seed = {
         "Tailwind CSS"
       ],
       "url": "https://landmarknikelakeresort.com/",
-      "image": "",
+      "image": "/project-covers/landmark-nike-lake-resort.gif",
+      "poster": "/project-covers/landmark-nike-lake-resort.jpg",
       "featured": false
     },
     {
@@ -123,7 +126,8 @@ export const seed = {
         "Tailwind CSS"
       ],
       "url": "https://landmarkafrica.com/",
-      "image": "",
+      "image": "/project-covers/landmark-africa.gif",
+      "poster": "/project-covers/landmark-africa.jpg",
       "featured": false
     },
     {
@@ -138,7 +142,8 @@ export const seed = {
         "Tailwind CSS"
       ],
       "url": "http://pos.landmarkafrica.com/shop",
-      "image": "",
+      "image": "/project-covers/landmark-marketplace.gif",
+      "poster": "/project-covers/landmark-marketplace.jpg",
       "featured": false
     },
     {
@@ -153,7 +158,8 @@ export const seed = {
         "Tailwind CSS"
       ],
       "url": "https://landmarkkidsclub.com/",
-      "image": "",
+      "image": "/project-covers/landmark-kids-club.gif",
+      "poster": "/project-covers/landmark-kids-club.jpg",
       "featured": false
     },
     {
@@ -168,7 +174,8 @@ export const seed = {
         "Tailwind CSS"
       ],
       "url": "https://upsidedownhouse.ng/",
-      "image": "",
+      "image": "/project-covers/upside-down-house.gif",
+      "poster": "/project-covers/upside-down-house.jpg",
       "featured": false
     },
     {
@@ -183,6 +190,22 @@ export const seed = {
         "Tailwind CSS"
       ],
       "url": "https://landmarkwaterview.com/",
+      "image": "/project-covers/landmark-waterview.gif",
+      "poster": "/project-covers/landmark-waterview.jpg",
+      "featured": false
+    },
+    {
+      "id": "digital-administration",
+      "title": "Digital Administration",
+      "category": "Web application",
+      "description": "A web platform for managing government agencies and their day-to-day operations. Built with Next.js and Tailwind CSS.",
+      "stack": [
+        "Next.js",
+        "React",
+        "Tailwind CSS",
+        "SaaS"
+      ],
+      "url": "https://digital-administration.vercel.app/",
       "image": "",
       "featured": false
     }
