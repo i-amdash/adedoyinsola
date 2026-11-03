@@ -414,8 +414,21 @@ export default function App() {
                 "You bring the idea. I bring it to life as a website, online store, custom platform, or mobile app."}
             </p>
             <div className="hero-actions">
-              <button className="primary-button" onClick={() => setPanel("contact")}>
-                Bring your idea to life <ArrowUpRight size={20} />
+              <button
+                className={`primary-button walk-button${!ready ? " is-loading" : ""}`}
+                disabled={!ready || !content || leaving}
+                onClick={walkIn}
+                aria-label={!ready ? `Loading the interactive world, ${Math.round(progress * 100)} percent` : undefined}
+              >
+                <span>
+                  {!ready
+                    ? `Loading my world… ${Math.round(progress * 100)}%`
+                    : worldError
+                      ? "Explore my portfolio"
+                      : "Take a walk through my interactive world"}
+                </span>
+                <ArrowUpRight size={20} />
+                {!ready && <i className="walk-progress" style={{ transform: `scaleX(${Math.max(0.04, progress)})` }} />}
               </button>
               <button className="browse-button" onClick={() => setPanel("projects")}>
                 See my work <ArrowRight size={16} />
@@ -423,9 +436,9 @@ export default function App() {
             </div>
             <div className="hero-note">
               <span className="tiny-line" />
-              <button disabled={!ready || !content || leaving} onClick={walkIn}>
-                {!ready ? `Loading my interactive world… ${Math.round(progress * 100)}%` : worldError ? "Explore my portfolio" : "Or take a walk through my interactive world"}
-                <ArrowUpRight size={14}/>
+              <button onClick={() => setPanel("contact")}>
+                Or bring your idea to life
+                <ArrowUpRight size={14} />
               </button>
             </div>
           </section>

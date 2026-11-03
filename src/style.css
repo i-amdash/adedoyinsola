@@ -3006,3 +3006,14 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .moderation-list li > :last-child { margin-left: auto; display: flex; gap: 10px; align-items: center; }
 .danger-button { background: #a13b2c; color: #fff; border-radius: 3px; padding: 8px 12px; font-size: 12px; }
 .admin-hint { font-size: 12px; color: #6a7763; line-height: 1.6; }
+
+/* Walk-in is the main call to action; it shows world loading progress until it's ready. */
+.walk-button { text-align: left; max-width: 100%; }
+.walk-button > span { white-space: normal; line-height: 1.35; }
+.walk-button.is-loading { cursor: progress; background: #c5ed8bcc; font-variant-numeric: tabular-nums; }
+.walk-button:disabled { opacity: 1; }
+.walk-progress { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: #203222; opacity: 0.55; transform-origin: left; transition: transform 0.45s ease; }
+@media (max-width: 600px) {
+  .hero-actions { flex-wrap: wrap; gap: 14px 22px; }
+  .walk-button { gap: 18px; }
+}
