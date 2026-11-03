@@ -35,7 +35,7 @@ export const seed = {
         "Google Auth",
         "Payments"
       ],
-      "url": "",
+      "url": "https://landmarkafrica.com/citizen",
       "image": "/project-covers/landmark-citizen-app.gif",
       "poster": "/project-covers/landmark-citizen-app.jpg",
       "featured": true

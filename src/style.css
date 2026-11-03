@@ -2785,3 +2785,156 @@ button:disabled { cursor: not-allowed; opacity: .5; }
     height: 36px;
   }
 }
+
+/* ======================================================================
+   Motion (v6): intro choreography after the loader, hero exit, HUD
+   entrance, panel content stagger and button micro-interactions.
+   Every entrance uses `both` fill so reduced-motion (animations off)
+   leaves everything in its natural, visible state.
+   ====================================================================== */
+:root {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-io: cubic-bezier(0.76, 0, 0.24, 1);
+}
+@keyframes m-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes m-drop { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
+@keyframes m-left { from { opacity: 0; transform: translateX(26px); } to { opacity: 1; transform: none; } }
+@keyframes m-right { from { opacity: 0; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
+@keyframes m-line { from { transform: translateY(110%) rotate(2deg); } to { transform: none; } }
+@keyframes m-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes m-settle { from { transform: scale(1.07); filter: brightness(0.6); } to { transform: none; filter: none; } }
+@keyframes m-out { to { opacity: 0; transform: translateY(-22px); filter: blur(6px); } }
+@keyframes m-pop { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: none; } }
+
+/* Hold every intro animation on its first frame until the loader curtain opens. */
+.experience:not(.is-revealed) .world-canvas,
+.experience:not(.is-revealed) .topbar > *,
+.experience:not(.is-revealed) .hero > *,
+.experience:not(.is-revealed) .hero h1 .hero-line > span,
+.experience:not(.is-revealed) .location-tag,
+.experience:not(.is-revealed) .world-tools,
+.experience:not(.is-revealed) .bottom-bar,
+.experience:not(.is-revealed) .tiny-line {
+  animation-play-state: paused !important;
+}
+
+/* The street settles into place as the curtain opens. */
+.world-canvas { animation: m-settle 2.4s var(--ease-out) both; transform-origin: 50% 60%; }
+
+/* Top bar */
+.topbar > * { animation: m-drop 0.8s var(--ease-out) both; }
+.topbar > :nth-child(1) { animation-delay: 0.05s; }
+.topbar > :nth-child(2) { animation-delay: 0.15s; }
+.topbar > :nth-child(3) { animation-delay: 0.25s; }
+
+/* Hero: replace the old single fade with a staggered build. */
+.hero { animation: none; }
+.hero > * { animation: m-rise 0.9s var(--ease-out) both; }
+.hero > .hero-eyebrow { animation-delay: 0.1s; }
+.hero h1 { animation: none; }
+.hero h1 .hero-line { overflow: hidden; padding-bottom: 0.08em; margin-bottom: -0.08em; }
+.hero h1 .hero-line > span { animation: m-line 1.1s var(--ease-out) both; transform-origin: 0 100%; }
+.hero h1 .hero-line:nth-child(1) > span { animation-delay: 0.2s; }
+.hero h1 .hero-line:nth-child(2) > span { animation-delay: 0.32s; }
+.hero > .hero-role { animation-delay: 0.55s; }
+.hero > .hero-description { animation-delay: 0.62s; }
+.hero > .hero-actions { animation-delay: 0.72s; }
+.hero > .hero-note { animation-delay: 0.85s; }
+.tiny-line { transform-origin: left; animation: m-draw 0.9s 1s var(--ease-out) both; }
+.location-tag { animation: m-left 1s 0.7s var(--ease-out) both; }
+.location-cross { display: inline-block; transition: transform 0.6s var(--ease-out); }
+.location-tag:hover .location-cross { transform: rotate(90deg); }
+.world-tools { animation: m-rise 0.9s 0.9s var(--ease-out) both; }
+.bottom-bar { animation: m-rise 0.9s 1s var(--ease-out) both; }
+
+/* Hero exits before the camera swoops into the street. */
+.experience.is-leaving .hero > *,
+.experience.is-leaving .location-tag {
+  animation: m-out 0.42s var(--ease-io) both !important;
+}
+.experience.is-leaving .hero > :nth-child(2) { animation-delay: 0.03s !important; }
+.experience.is-leaving .hero > :nth-child(n + 3) { animation-delay: 0.06s !important; }
+
+/* Driving / walking HUD slides in when you enter the world. */
+.experience.is-playing .playing-label { animation: m-drop-c 0.7s 0.2s var(--ease-out) both; }
+.experience.is-playing .speedometer { animation: m-left 0.8s 0.35s var(--ease-out) both; }
+.experience.is-playing .bottom-left { animation: m-right 0.8s 0.3s var(--ease-out) both; }
+.experience.is-playing .touch-controls { animation: m-rise 0.8s 0.45s var(--ease-out) both; }
+.speedometer > strong { display: inline-block; transition: transform 0.2s ease; font-variant-numeric: tabular-nums; }
+.race-hud, .interaction-prompt { animation: m-pop-c 0.45s var(--ease-out) both; }
+@media (max-width: 1100px), (pointer: coarse) {
+  .experience.is-playing .bottom-left { animation-name: m-left; }
+}
+
+/* Buttons: arrow nudges, a soft sheen and press feedback. */
+.primary-button { position: relative; overflow: hidden; transition: background 0.25s ease, transform 0.35s var(--ease-out), box-shadow 0.35s ease; }
+.primary-button::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, #ffffff8c 50%, transparent 65%);
+  transform: translateX(-120%);
+}
+.primary-button:hover:not(:disabled) { box-shadow: 0 12px 30px #c5ed8b33; }
+.primary-button:hover:not(:disabled)::after { transform: translateX(120%); transition: transform 0.8s var(--ease-out); }
+.primary-button:active:not(:disabled) { transform: translateY(0) scale(0.98); }
+.primary-button svg, .browse-button svg, .hero-note button svg, .desktop-nav button svg, .map-top svg {
+  transition: transform 0.35s var(--ease-out);
+}
+.primary-button:hover svg, .hero-note button:hover:not(:disabled) svg, .desktop-nav button:hover svg { transform: translate(3px, -3px); }
+.browse-button:hover svg { transform: translateX(5px); }
+.map-top:hover svg { transform: rotate(-8deg) scale(1.08); }
+.desktop-nav button { position: relative; }
+.desktop-nav button::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -4px; height: 1px;
+  background: var(--accent); transform: scaleX(0); transform-origin: right;
+  transition: transform 0.45s var(--ease-out);
+}
+.desktop-nav button:hover::after, .desktop-nav button:focus-visible::after { transform: scaleX(1); transform-origin: left; }
+.round-button { transition: transform 0.35s var(--ease-out), background 0.2s ease; }
+.round-button:hover { transform: rotate(90deg); }
+.world-tools button { transition: transform 0.3s var(--ease-out), background 0.2s ease, border-color 0.2s ease; }
+.world-tools button:hover { transform: translateY(-3px); }
+.world-tools button:active, .touch-controls .touch-brake:active { transform: scale(0.94); }
+
+/* Panels: the sheet glides in, then its content cascades. */
+.content-panel { animation: m-panel 0.55s var(--ease-out) both; }
+@keyframes m-panel { from { transform: translateX(60px); opacity: 0; } to { transform: none; opacity: 1; } }
+.panel-body > *,
+.panel-body > * > .service-list > article,
+.service-list > article,
+.project-selector > button {
+  animation: m-rise 0.7s var(--ease-out) both;
+}
+.panel-body > :nth-child(1) { animation-delay: 0.08s; }
+.panel-body > :nth-child(2) { animation-delay: 0.14s; }
+.panel-body > :nth-child(3) { animation-delay: 0.2s; }
+.panel-body > :nth-child(4) { animation-delay: 0.26s; }
+.panel-body > :nth-child(5) { animation-delay: 0.32s; }
+.panel-body > :nth-child(6) { animation-delay: 0.38s; }
+.panel-body > :nth-child(n + 7) { animation-delay: 0.44s; }
+.service-list > article:nth-child(1) { animation-delay: 0.3s; }
+.service-list > article:nth-child(2) { animation-delay: 0.38s; }
+.service-list > article:nth-child(3) { animation-delay: 0.46s; }
+.service-list > article:nth-child(4) { animation-delay: 0.54s; }
+.project-selector > button:nth-child(1) { animation-delay: 0.2s; }
+.project-selector > button:nth-child(2) { animation-delay: 0.24s; }
+.project-selector > button:nth-child(3) { animation-delay: 0.28s; }
+.project-selector > button:nth-child(4) { animation-delay: 0.32s; }
+.project-selector > button:nth-child(5) { animation-delay: 0.36s; }
+.project-selector > button:nth-child(6) { animation-delay: 0.4s; }
+.project-selector > button:nth-child(n + 7) { animation-delay: 0.44s; }
+.project-selector > button { transition: transform 0.3s var(--ease-out), background 0.2s ease; }
+.project-selector > button:hover { transform: translateX(4px); }
+
+/* Project cover: slow Ken Burns while it plays, sharper on hover. */
+.project-feature .project-art > img.project-cover,
+.project-feature .project-art > img:only-child { transition: transform 1.2s var(--ease-out), opacity 0.45s ease; }
+.project-feature:hover .project-art > img.project-cover,
+.project-feature:hover .project-art > img:only-child { transform: scale(1.025); }
+.project-feature { animation: m-pop 0.5s var(--ease-out) both; }
+.tags span { transition: transform 0.25s var(--ease-out), background 0.2s ease; }
+.tags span:hover { transform: translateY(-2px); }
+
+.toast { animation: m-drop-c 0.45s var(--ease-out) both; }
+/* Variants for elements centred with translateX(-50%). */
+@keyframes m-drop-c { from { opacity: 0; transform: translate(-50%, -14px); } to { opacity: 1; transform: translateX(-50%); } }
+@keyframes m-pop-c { from { opacity: 0; transform: translateX(-50%) scale(0.9); } to { opacity: 1; transform: translateX(-50%); } }

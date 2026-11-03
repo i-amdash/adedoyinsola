@@ -30,6 +30,7 @@ import type { World } from "./world/World";
 import type { Quality, TimeOfDay } from "./world/Atmosphere";
 import Radar from "./Radar";
 import Joystick from "./Joystick";
+import { bootFinish, bootProgress } from "./boot";
 import {
   destinations,
   type Content,
@@ -73,13 +74,28 @@ export default function App() {
     [full, setFull] = useState(false),
     [worldError, setWorldError] = useState(false),
     [copied, setCopied] = useState(false),
-    [toast, setToast] = useState("");
+    [toast, setToast] = useState(""),
+    [revealed, setRevealed] = useState(false),
+    [leaving, setLeaving] = useState(false);
   const host = useRef<HTMLDivElement>(null),
     world = useRef<World | null>(null),
     lastNear = useRef<Destination | null>(null),
     modal = useRef<HTMLDivElement>(null),
     previousFocus = useRef<HTMLElement | null>(null),
     closeButton = useRef<HTMLButtonElement>(null);
+  // Loader: mirror world loading progress, then open the curtain once there is something to show.
+  useEffect(() => {
+    bootProgress(Math.min(0.96, (content ? 0.12 : 0) + progress * 0.84), progress >= 1 ? "Opening the street" : content ? "Building Palm Avenue" : "Gathering my work");
+  }, [progress, content]);
+  useEffect(() => {
+    const reveal = () => setRevealed(true);
+    if (error) return bootFinish(reveal);
+    if (!content) return;
+    if (ready) return bootFinish(reveal);
+    // Never hold visitors behind a slow 3D download: the hero reveals after 6s and keeps loading.
+    const t = setTimeout(() => bootFinish(reveal), 6000);
+    return () => clearTimeout(t);
+  }, [content, ready, error]);
   const startedRef = useRef(false),
     lastRace = useRef("idle");
   useEffect(() => {
@@ -205,7 +221,14 @@ export default function App() {
     }
     if (!telemetry.near) lastNear.current = null;
   }, [telemetry.near, started]);
+  function walkIn() {
+    if (leaving) return;
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return start();
+    setLeaving(true);
+    setTimeout(start, 420);
+  }
   function start() {
+    setLeaving(false);
     setStarted(true);
     startedRef.current = true;
     world.current?.enter();
@@ -275,7 +298,7 @@ export default function App() {
     );
   return (
     <main
-      className={`experience ${started ? "is-playing" : ""}`}
+      className={`experience${started ? " is-playing" : ""}${revealed ? " is-revealed" : ""}${leaving ? " is-leaving" : ""}`}
       style={
         content
           ? ({ "--accent": content.world.accent } as React.CSSProperties)
@@ -319,8 +342,8 @@ export default function App() {
               {(content?.world.title || "Your vision.\nBrought to life.")
                 .split("\n")
                 .map((line, i) => (
-                  <span key={i} className={i ? "heading-accent" : ""}>
-                    {line}
+                  <span key={i} className={`hero-line${i ? " heading-accent" : ""}`}>
+                    <span>{line}</span>
                   </span>
                 ))}
             </h1>
@@ -341,7 +364,7 @@ export default function App() {
             </div>
             <div className="hero-note">
               <span className="tiny-line" />
-              <button disabled={!ready || !content} onClick={start}>
+              <button disabled={!ready || !content || leaving} onClick={walkIn}>
                 {!ready ? `Loading my interactive world… ${Math.round(progress * 100)}%` : worldError ? "Explore my portfolio" : "Or take a walk through my interactive world"}
                 <ArrowUpRight size={14}/>
               </button>

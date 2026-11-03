@@ -1,1 +1,23 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/><meta name="theme-color" content="#121917"/><meta name="description" content="Bring your ideas to life with Adedoyinsola. Websites, online stores, custom platforms and mobile apps designed and developed to earn trust and win customers."/><title>Adedoyinsola — Web & mobile app developer</title><link rel="icon" href="/favicon.svg"/></head><body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>
+<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/><meta name="theme-color" content="#121917"/><meta name="description" content="Bring your ideas to life with Adedoyinsola. Websites, online stores, custom platforms and mobile apps, designed and developed with care in every detail."/><title>Adedoyinsola — Web & mobile app developer</title><link rel="icon" href="/favicon.svg"/><link rel="preload" href="/fonts/font-8.ttf" as="font" type="font/ttf" crossorigin/>
+<style>
+@font-face{font-family:"Manrope";font-weight:800;font-display:swap;src:url(/fonts/font-8.ttf) format("truetype")}
+html,body{background:#121917}
+#boot{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:#121917;color:#f4f2e9;font-family:"DM Sans",system-ui,sans-serif;--p:0;overflow:hidden}
+#boot::before,#boot::after{content:"";position:absolute;left:0;right:0;height:50.5%;background:#121917;transition:transform .9s cubic-bezier(.76,0,.24,1)}
+#boot::before{top:0}#boot::after{bottom:0}
+#boot.is-done{background:transparent;pointer-events:none}
+#boot.is-done::before{transform:translateY(-100%)}#boot.is-done::after{transform:translateY(100%)}
+.boot-inner{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;transition:opacity .35s ease,transform .5s cubic-bezier(.76,0,.24,1)}
+#boot.is-done .boot-inner{opacity:0;transform:scale(.96)}
+.boot-mark{font-family:"Manrope",system-ui,sans-serif;font-weight:800;font-size:clamp(84px,14vw,124px);line-height:1;letter-spacing:-.12em;display:flex;overflow:hidden;padding:0 .08em .06em}
+.boot-mark span{display:inline-block;animation:boot-rise 1s cubic-bezier(.2,.8,.2,1) both}
+.boot-mark span:last-child{color:#c5ed8b;animation-delay:.18s,1.2s;animation-name:boot-rise,boot-pulse;animation-duration:1s,1.6s;animation-iteration-count:1,infinite;animation-timing-function:cubic-bezier(.2,.8,.2,1),ease-in-out}
+.boot-name{margin-top:18px;font-size:11px;font-weight:700;letter-spacing:.32em;text-indent:.32em;color:#e8ecdf;animation:boot-fade .8s .35s both}
+.boot-bar{width:min(220px,60vw);height:1px;margin-top:34px;background:rgba(232,239,219,.16);position:relative;overflow:hidden;animation:boot-fade .8s .5s both}
+.boot-bar i{position:absolute;inset:0;background:#c5ed8b;transform-origin:left;transform:scaleX(var(--p));transition:transform .45s ease}
+.boot-meta{width:min(220px,60vw);display:flex;justify-content:space-between;margin-top:12px;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#93a08f;font-variant-numeric:tabular-nums;animation:boot-fade .8s .6s both}
+@keyframes boot-rise{from{transform:translateY(105%)}to{transform:none}}
+@keyframes boot-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes boot-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){#boot *{animation:none!important}#boot::before,#boot::after,.boot-inner{transition:opacity .3s!important}#boot.is-done::before,#boot.is-done::after{transform:none;opacity:0}}
+</style></head><body><div id="boot" role="status" aria-live="polite" aria-label="Loading"><div class="boot-inner"><div class="boot-mark" aria-hidden="true"><span>a</span><span>.</span></div><div class="boot-name">ADEDOYINSOLA</div><div class="boot-bar"><i></i></div><div class="boot-meta"><span id="boot-label">Building Palm Avenue</span><span id="boot-pct">0%</span></div></div></div><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>
