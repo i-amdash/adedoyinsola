@@ -155,3 +155,50 @@ test("project creation and removal are reflected in the public content API", asy
     false,
   );
 });
+
+test("a paused or unreachable database still serves the site's content", async (t) => {
+  const failing = { then: (r) => r({ data: null, error: { code: "57P01", message: "unavailable" } }) };
+  const chain = new Proxy({}, { get: (_, k) => (k === "then" ? failing.then : () => chain) });
+  const f = await fixture(t, { supabase: { from: () => chain, rpc: () => chain, storage: { from: () => chain } } });
+  const r = await f.req("/api/content");
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get("x-content-source"), "built-in");
+  assert.ok((await r.json()).projects.length > 0);
+});
+
+test("stored content that no longer matches the schema is repaired, not fatal", async (t) => {
+  const f = await fixture(t);
+  const { writeFile } = await import("node:fs/promises");
+  const good = await (await f.req("/api/content")).json();
+  const broken = { ...good, world: { ...good.world, accent: "not-a-colour" }, projects: [{ id: "BAD ID" }, good.projects[0]] };
+  await writeFile(f.dir + "/content.json", JSON.stringify(broken));
+  const r = await f.req("/api/content");
+  assert.equal(r.status, 200);
+  const data = await r.json();
+  assert.match(data.world.accent, /^#[0-9a-f]{6}$/i);
+  assert.deepEqual(data.projects.map((p) => p.id), [good.projects[0].id]);
+  assert.equal(data.profile.name, good.profile.name, "valid sections are kept");
+});
+
+test("admin cookies are tied to the current password and compressed bodies are refused", async (t) => {
+  const f = await fixture(t);
+  const login = await f.req("/api/auth/login", "POST", { password: pass });
+  const cookie = login.headers.get("set-cookie").split(";")[0];
+  assert.equal((await (await f.req("/api/auth/session", "GET", undefined, cookie)).json()).authenticated, true);
+  const stale = cookie.replace(/\.[0-9a-f]{16}$/, ".0000000000000000");
+  assert.equal((await (await f.req("/api/auth/session", "GET", undefined, stale)).json()).authenticated, false);
+  const gz = await fetch(f.base + "/api/players/login", { method: "POST", headers: { "Content-Type": "application/json", "Content-Encoding": "gzip" }, body: Buffer.from([31, 139, 8, 0]) });
+  assert.equal(gz.status, 415);
+});
+
+test("the admin can remove a player and their scores leave the leaderboard", async (t) => {
+  const f = await fixture(t);
+  const admin = (await f.req("/api/auth/login", "POST", { password: pass })).headers.get("set-cookie").split(";")[0];
+  const reg = await f.req("/api/players/register", "POST", { username: "spam_name", password: "test-passphrase-1234" });
+  const player = (await reg.json()).player;
+  assert.equal((await f.req("/api/admin/players")).status, 401, "moderation needs the admin");
+  const list = await (await f.req("/api/admin/players?q=spam", "GET", undefined, admin)).json();
+  assert.deepEqual(list.players.map((p) => p.username), ["spam_name"]);
+  assert.equal((await f.req("/api/admin/players/remove", "POST", { id: player.id }, admin)).status, 200);
+  assert.deepEqual((await (await f.req("/api/admin/players", "GET", undefined, admin)).json()).players, []);
+});

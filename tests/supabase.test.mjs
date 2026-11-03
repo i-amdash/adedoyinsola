@@ -65,6 +65,14 @@ test("the Supabase SQL enforces private access, atomic game completion and share
     assert.ok(board.entries.every(row => !('password_hash' in row)));
     assert.equal((await query("select portfolio_leaderboard('sprint') as result"))[0].result.total, 0);
   });
+  await t.test("new games are constrained and taxi ranks the most trips first", async () => {
+    await assert.rejects(query("insert into portfolio_scores(id,player_id,game,duration_ms,moves) values ($1,$2,'taxi',301000,5)", [randomUUID(), a]), { code: "23514" });
+    await assert.rejects(query("insert into portfolio_scores(id,player_id,game,duration_ms) values ($1,$2,'unknown',30000)", [randomUUID(), a]), { code: "23514" });
+    await query("insert into portfolio_scores(id,player_id,game,duration_ms,moves) values ($1,$2,'taxi',290000,9),($3,$4,'taxi',280000,12),($5,$6,'taxi',250000,12)", [randomUUID(), a, randomUUID(), b, randomUUID(), c]);
+    const board = (await query("select portfolio_leaderboard('taxi') as result"))[0].result;
+    assert.deepEqual(board.entries.map(row => [row.username, row.moves]), [["player_c", 12], ["player_b", 12], ["player_a", 9]]);
+    await query("insert into portfolio_attempts(id,player_id,game,starts_at,expires_at) values ($1,$2,'hunt',now()-interval '2 minutes',now()+interval '1 hour')", [randomUUID(), a]);
+  });
   await t.test("rate limits share counters and reset after expiration", async () => {
     assert.equal((await query("select portfolio_rate_hit('test',1000) as result"))[0].result.totalHits, 1);
     assert.equal((await query("select portfolio_rate_hit('test',1000) as result"))[0].result.totalHits, 2);

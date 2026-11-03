@@ -18,7 +18,7 @@ create unique index if not exists portfolio_players_username_unique on public.po
 create table if not exists public.portfolio_attempts (
   id uuid primary key default gen_random_uuid(),
   player_id uuid not null references public.portfolio_players(id) on delete cascade,
-  game text not null check (game in ('memory', 'sprint')),
+  game text not null,
   starts_at timestamptz not null,
   expires_at timestamptz not null,
   unique (player_id, game)
@@ -27,12 +27,30 @@ create index if not exists portfolio_attempts_expiry on public.portfolio_attempt
 create table if not exists public.portfolio_scores (
   id uuid primary key,
   player_id uuid not null references public.portfolio_players(id) on delete cascade,
-  game text not null check (game in ('memory', 'sprint')),
+  game text not null,
   duration_ms integer not null check (duration_ms between 1000 and 3600000),
   moves integer,
-  completed_at timestamptz not null default now(),
-  check ((game = 'memory' and moves is not null and moves between 6 and 10000) or (game = 'sprint' and moves is null and duration_ms >= 15000))
+  completed_at timestamptz not null default now()
 );
+-- Game rules live in named constraints so rerunning this script upgrades older installs
+-- (mirrors shared/games.mjs). Older unnamed checks are removed first.
+alter table public.portfolio_attempts drop constraint if exists portfolio_attempts_game_check;
+alter table public.portfolio_attempts drop constraint if exists portfolio_attempts_game_valid;
+alter table public.portfolio_attempts add constraint portfolio_attempts_game_valid
+  check (game in ('sprint', 'dispatch', 'taxi', 'parking', 'hunt', 'memory', 'guess'));
+alter table public.portfolio_scores drop constraint if exists portfolio_scores_game_check;
+alter table public.portfolio_scores drop constraint if exists portfolio_scores_check;
+alter table public.portfolio_scores drop constraint if exists portfolio_scores_valid;
+alter table public.portfolio_scores add constraint portfolio_scores_valid check (
+  (game = 'sprint' and moves is null and duration_ms >= 15000) or
+  (game = 'dispatch' and moves is null and duration_ms >= 30000) or
+  (game = 'hunt' and moves is null and duration_ms >= 40000) or
+  (game = 'taxi' and moves between 0 and 60 and duration_ms <= 300000 and moves * 6000 <= duration_ms) or
+  (game = 'parking' and moves between 0 and 99 and duration_ms >= 15000) or
+  (game = 'memory' and moves between 6 and 10000 and duration_ms >= 3000) or
+  (game = 'guess' and moves between 0 and 8000 and duration_ms >= 4400 and moves * 11 <= duration_ms * 10)
+) not valid;
+-- Older rows are kept (not re-validated); new rows must pass.
 create index if not exists portfolio_scores_best on public.portfolio_scores (game, player_id, moves, duration_ms, completed_at);
 create table if not exists public.portfolio_sessions (
   token_hash text primary key,
@@ -80,6 +98,15 @@ begin
   insert into public.portfolio_scores(id, player_id, game, duration_ms, moves)
     values (p_attempt, p_player, p_game, p_duration, p_moves) returning * into s;
   delete from public.portfolio_attempts where id = p_attempt;
+  -- Only a player's best result matters for rankings: drop their older, worse results for
+  -- this game (anything from the last day is kept so retries stay idempotent).
+  delete from public.portfolio_scores x
+  where x.player_id = p_player and x.game = p_game and x.id <> p_attempt
+    and x.completed_at < now() - interval '1 day'
+    and x.id <> (
+      select b.id from public.portfolio_scores b where b.player_id = p_player and b.game = p_game
+      order by case when b.game in ('taxi', 'guess') then -b.moves else coalesce(b.moves, 0) end, b.duration_ms, b.completed_at, b.id
+      limit 1);
   return to_jsonb(s);
 end $$;
 
@@ -89,9 +116,10 @@ returns jsonb language sql stable security invoker set search_path = '' as $$
     select distinct on (s.player_id) s.*, p.username
     from public.portfolio_scores s join public.portfolio_players p on p.id = s.player_id
     where s.game = p_game
-    order by s.player_id, coalesce(s.moves, 0), s.duration_ms, s.completed_at, s.id
+    order by s.player_id, case when s.game in ('taxi', 'guess') then -s.moves else coalesce(s.moves, 0) end, s.duration_ms, s.completed_at, s.id
   ), ranked as (
-    select *, rank() over (order by coalesce(moves, 0), duration_ms) as rank from best
+    -- Trips and points rank highest first; moves and scrapes lowest first; then fastest.
+    select *, rank() over (order by case when game in ('taxi', 'guess') then -moves else coalesce(moves, 0) end, duration_ms) as rank from best
   ), display as (
     select player_id, rank, completed_at, jsonb_build_object('id', id, 'playerId', player_id, 'username', username,
       'game', game, 'durationMs', duration_ms, 'completedAt', completed_at, 'rank', rank) ||

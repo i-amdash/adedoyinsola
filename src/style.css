@@ -2938,3 +2938,71 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 /* Variants for elements centred with translateX(-50%). */
 @keyframes m-drop-c { from { opacity: 0; transform: translate(-50%, -14px); } to { opacity: 1; transform: translateX(-50%); } }
 @keyframes m-pop-c { from { opacity: 0; transform: translateX(-50%) scale(0.9); } to { opacity: 1; transform: translateX(-50%); } }
+
+/* ---------- Games v7: challenge list, guess game, mission HUD ---------- */
+.challenge-list { display: grid; gap: 10px; margin: 14px 0 30px; }
+.challenge-list .race-card { margin: 0; padding: 18px 20px; }
+.challenge-list .race-card p { line-height: 1.6; max-width: 330px; }
+.challenge-list .race-card small { display: block; margin-top: 6px; font-size: 9px; letter-spacing: 0.6px; color: #5c7448; font-weight: 600; }
+.guess-game { margin-bottom: 30px; }
+.guess-stage { margin-top: 18px; }
+.guess-frame { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 5px; background: #1d2b24; border: 1px solid #c5d0b9; }
+.guess-frame img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.08); }
+.guess-timer { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--accent); transform-origin: left; }
+.guess-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.guess-options button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 46px; padding: 10px 12px; border: 1px solid #c5d0b9; border-radius: 5px; background: #e8ede0; color: #2f4a34; font-size: 12px; font-weight: 500; transition: background 0.2s ease, transform 0.25s var(--ease-out, ease); }
+.guess-options button:hover:not(:disabled) { background: #dbe5cd; transform: translateY(-2px); }
+.guess-options button.is-right { background: #405f36; border-color: #405f36; color: #eef6df; }
+.guess-options button.is-wrong { background: #f1d6cc; border-color: #d9a796; color: #7a3424; }
+.guess-options button:disabled { cursor: default; }
+.mission-hud { min-width: 250px; max-width: min(92vw, 380px); }
+.mission-hud .mission-progress { font-size: 12px; font-weight: 600; color: #eef6df; margin: 2px 0 6px; }
+@media (max-width: 600px) {
+  .mission-hud { top: 128px; padding: 10px 14px; min-width: 210px; }
+  .mission-hud strong { font-size: 28px; }
+  .mission-hud p:not(.mission-progress) { font-size: 9px; }
+  .guess-options { grid-template-columns: 1fr; }
+}
+.scoreboard .game-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.scoreboard .game-tabs button { white-space: nowrap; }
+.guess-options button:disabled { opacity: 0.55; }
+.guess-options button.is-right, .guess-options button.is-wrong { opacity: 1; }
+.guess-frame img { transition: filter 0.08s linear; }
+.guess-timer { transition: transform 0.06s linear; }
+
+/* ---------- Audit fixes: short/landscape phones, notches, moderation ---------- */
+/* The hero keeps its minimum height (the page can scroll), but the play view always fits
+   the screen exactly so the joystick and brake are never below the fold. */
+.experience.is-playing { min-height: 0; height: 100svh; }
+@supports (height: 100dvh) { .experience.is-playing { height: 100dvh; } }
+@media (max-width: 1100px), (pointer: coarse) {
+  .touch-controls { left: calc(20px + env(safe-area-inset-left)); bottom: calc(64px + env(safe-area-inset-bottom)); }
+  .bottom-left { right: calc(23px + env(safe-area-inset-right)); top: calc(76px + env(safe-area-inset-top)); }
+  .speedometer, .world-tools { right: calc(25px + env(safe-area-inset-right)); }
+  .topbar { padding-left: calc(23px + env(safe-area-inset-left)); padding-right: calc(23px + env(safe-area-inset-right)); padding-top: calc(19px + env(safe-area-inset-top)); }
+}
+@media (max-height: 520px) {
+  .experience.is-playing .bottom-bar, .experience.is-playing .playing-label, .experience.is-playing .world-status { display: none; }
+  .experience.is-playing .topbar { padding-top: calc(8px + env(safe-area-inset-top)); }
+  .experience.is-playing .brand-mark { font-size: 30px; }
+  .experience.is-playing .bottom-left { top: calc(58px + env(safe-area-inset-top)); right: calc(23px + env(safe-area-inset-right)); }
+  .experience.is-playing .map-top { padding: 9px 11px; }
+  .experience.is-playing .map-top span, .experience.is-playing .map-top kbd { display: none; }
+  .experience.is-playing .radar { height: 76px; }
+  .experience.is-playing .radar-wrap { width: 118px; }
+  .experience.is-playing .touch-controls { bottom: calc(14px + env(safe-area-inset-bottom)); }
+  .experience.is-playing .world-tools { bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .experience.is-playing .speedometer { bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .experience.is-playing .speedometer > strong { font-size: 34px; }
+  .race-hud, .mission-hud { top: calc(10px + env(safe-area-inset-top)); padding: 8px 14px; }
+  .race-hud strong, .mission-hud strong { font-size: 24px; }
+  .interaction-prompt { bottom: calc(14px + env(safe-area-inset-bottom)); }
+}
+.moderation-search { display: flex; gap: 10px; margin: 16px 0; }
+.moderation-search input { flex: 1; padding: 11px 13px; border: 1px solid #263a3030; border-radius: 4px; background: #fff; }
+.moderation-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.moderation-list li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #263a3018; border-radius: 4px; background: #f7f7f0; }
+.moderation-list li small { color: #7b8673; font-size: 11px; }
+.moderation-list li > :last-child { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+.danger-button { background: #a13b2c; color: #fff; border-radius: 3px; padding: 8px 12px; font-size: 12px; }
+.admin-hint { font-size: 12px; color: #6a7763; line-height: 1.6; }

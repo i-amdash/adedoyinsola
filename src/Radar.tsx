@@ -138,6 +138,39 @@ export default function Radar({
         ctx.textBaseline = "middle";
         ctx.fillText(d.symbol, x, y + 0.5);
       }
+      // Challenge objective (clamped like a destination) and nearby hunt tokens.
+      const m = w?.missions;
+      if (m?.active) {
+        const colors = { pickup: "#ffd36b", drop: "#c5ed8b", park: "#9fd4ff" } as const;
+        if (m.target) {
+          let [x, y] = rot(m.target.x, m.target.z);
+          x = Math.min(W - pad, Math.max(pad, x));
+          y = Math.min(H - pad, Math.max(pad, y));
+          ctx.beginPath();
+          ctx.arc(x, y, 9, 0, Math.PI * 2);
+          ctx.fillStyle = colors[m.target.kind];
+          ctx.fill();
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = "#ffffff";
+          ctx.stroke();
+          ctx.fillStyle = "#0e1612";
+          ctx.font = "800 9px 'DM Sans', sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(m.target.kind === "park" ? "P" : m.target.kind === "drop" ? "⚑" : "●", x, y + 0.5);
+        }
+        for (const t of m.tokens) {
+          if (t.taken || Math.hypot(t.x - f.x, t.z - f.z) > 60) continue;
+          const [x, y] = rot(t.x, t.z);
+          ctx.beginPath();
+          ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+          ctx.fillStyle = "#c5ed8b";
+          ctx.fill();
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = "#0e1612";
+          ctx.stroke();
+        }
+      }
       // North marker on the rim.
       const nx = cx + Math.sin(-view) * -999,
         ny = cy - Math.cos(-view) * 999;

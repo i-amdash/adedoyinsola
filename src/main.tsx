@@ -1,12 +1,49 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import Admin from "./Admin";
 import "./style.css";
 import { bootRemove } from "./boot";
-if (location.pathname.startsWith("/admin")) bootRemove();
+
+// Visitors never download the admin studio; it loads only on /admin.
+const Admin = lazy(() => import("./Admin"));
+const isAdmin = location.pathname.startsWith("/admin");
+if (isAdmin) bootRemove();
+
+/** If anything throws while rendering, show a calm fallback instead of a blank page. */
+class Boundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: unknown) {
+    console.error("Page error", error);
+    bootRemove();
+  }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <main className="error-screen">
+        <h1>Something went wrong.</h1>
+        <p>Please reload the page. If it keeps happening, you can still reach me at the email below.</p>
+        <p>
+          <a href="mailto:ashimidoyin@yahoo.com">ashimidoyin@yahoo.com</a>
+        </p>
+        <button onClick={() => location.reload()}>Reload</button>
+      </main>
+    );
+  }
+}
+
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {location.pathname.startsWith("/admin") ? <Admin /> : <App />}
+    <Boundary>
+      {isAdmin ? (
+        <Suspense fallback={<main className="admin-loading">Loading the studio…</main>}>
+          <Admin />
+        </Suspense>
+      ) : (
+        <App />
+      )}
+    </Boundary>
   </React.StrictMode>,
 );

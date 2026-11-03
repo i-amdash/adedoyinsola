@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, RotateCcw, Flag, Trophy, X, LogOut } from "lucide-react";
-import { gameNames, type Game } from "../shared/games.mjs";
+import { ArrowUpRight, RotateCcw, Flag, Trophy, X, LogOut, Package, CarTaxiFront, SquareParking, Sparkles } from "lucide-react";
+import { gameNames, games as specs, type Game, type Score } from "../shared/games.mjs";
+import type { Project } from "./types";
+import GuessGame from "./game/GuessGame";
 import { api, type Board, type Games, type Entry } from "./game/useGames";
 import Celebration from "./game/Celebration";
 const symbols = ["✳", "◈", "⌘", "↗", "◉", "⌁"];
@@ -10,7 +12,37 @@ function shuffle() {
   return cards;
 }
 const time = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
-export default function Arcade({ onRace, games, raceAvailable }: { onRace: () => void; games: Games; raceAvailable: boolean }) {
+export type WorldGame = "sprint" | "dispatch" | "taxi" | "parking" | "hunt";
+const challenges: { id: WorldGame; icon: typeof Flag; text: string }[] = [
+  { id: "sprint", icon: Flag, text: "7 checkpoints down Palm Avenue. Fastest lap wins." },
+  { id: "dispatch", icon: Package, text: "Collect four parcels and deliver each one across the estate." },
+  { id: "taxi", icon: CarTaxiFront, text: "Five minutes. Pick passengers up, drop them at their stop. Most trips wins." },
+  { id: "parking", icon: SquareParking, text: "Park between the cones in three kerbside bays. Fewest scrapes wins." },
+  { id: "hunt", icon: Sparkles, text: "Ten glowing a. tokens are hidden around the estate. Find them all." },
+];
+const tabLabel: Record<Game, string> = { sprint: "Sprint", dispatch: "Dispatch", taxi: "Taxi", parking: "Parking", hunt: "a. hunt", memory: "Memory", guess: "Guess" };
+const rule: Record<Game, string> = {
+  sprint: "Fastest time wins.",
+  dispatch: "Fastest delivery run wins.",
+  taxi: "Most trips in five minutes. Ties go to whoever finished their last trip first.",
+  parking: "Fewest scrapes, then fastest time.",
+  hunt: "Fastest to find all ten wins.",
+  memory: "Fewest moves, then fastest time.",
+  guess: "Most points, then fastest time.",
+};
+/** The headline number for a result, e.g. "12 trips" or "48.2s". */
+export function headline(s: Score) {
+  const g = specs[s.game];
+  if (g.count === "none") return time(s.durationMs);
+  const unit = s.moves === 1 && g.unit ? g.unit.replace(/s$/, "") : g.unit;
+  return `${s.moves} ${unit}`;
+}
+function best(local: (Score & { rank: number })[], game: Game) {
+  const b = local[0];
+  if (!b) return "No score yet.";
+  return `Your best: ${headline(b)}${specs[game].count !== "none" && game !== "taxi" ? ` · ${time(b.durationMs)}` : ""}`;
+}
+export default function Arcade({ onPlay, games, worldAvailable, projects }: { onPlay: (game: WorldGame) => void; games: Games; worldAvailable: boolean; projects: Project[] }) {
   const [cards, setCards] = useState(shuffle), [open, setOpen] = useState<number[]>([]), [matched, setMatched] = useState<number[]>([]), [moves, setMoves] = useState(0);
   const [phase, setPhase] = useState<"idle" | "countdown" | "playing" | "finished">("idle"), [countdown, setCountdown] = useState(3), [elapsed, setElapsed] = useState(0);
   const [selectedGame, setSelectedGame] = useState<Game>(games.result?.game || "sprint");
@@ -25,14 +57,18 @@ export default function Arcade({ onRace, games, raceAvailable }: { onRace: () =>
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; if (timeout.current) clearTimeout(timeout.current); }; }, []);
   useEffect(() => {
     if (phase !== "countdown" && phase !== "playing") return;
-    let raf = 0, last = performance.now();
+    let raf = 0, last = performance.now(), shown = -1000;
     function frame(now: number) {
       const delta = document.hidden ? 0 : Math.min(100, now - last); last = now;
       clock.current += delta;
       if (phaseRef.current === "countdown") {
         setCountdown(Math.max(1, 3 - Math.floor(clock.current / 1000)));
         if (clock.current >= 3000) { clock.current = 0; phaseRef.current = "playing"; setPhase("playing"); }
-      } else if (phaseRef.current === "playing") setElapsed(clock.current);
+      } else if (phaseRef.current === "playing" && clock.current - shown >= 100) {
+        // The on-screen timer only needs ~10 updates a second.
+        shown = clock.current;
+        setElapsed(clock.current);
+      }
       raf = requestAnimationFrame(frame);
     }
     raf = requestAnimationFrame(frame);
@@ -76,29 +112,32 @@ export default function Arcade({ onRace, games, raceAvailable }: { onRace: () =>
   return <>
     <p className="eyebrow">Games</p>
     <h2>Take a break.<br /><span className="heading-accent">Beat your best.</span></h2>
-    <p className="panel-intro">Race through the neighbourhood or test your memory. Your results stay in this browser; sign in before playing to join the shared leaderboard.</p>
+    <p className="panel-intro">Drive, park, deliver and explore the neighbourhood, or test your memory. Your results stay in this browser; sign in before playing to join the shared leaderboard.</p>
     {latest && <section ref={resultCard} className="game-result" key={latest.id} aria-label="Game result" role="status">
       <Celebration /><button className="result-dismiss" aria-label="Dismiss result" onClick={games.dismissResult}><X size={16}/></button>
       <Trophy size={24}/><p className="eyebrow">{gameNames[latest.game]} · Complete</p>
-      <strong>{latest.game === "memory" ? `${latest.moves} moves` : time(latest.durationMs)}</strong>
-      <p>{latest.game === "memory" && `${time(latest.durationMs)} · `}#{rank} in this browser {rank === 1 ? "· Personal best!" : "· Keep climbing."}</p>
+      <strong>{headline(latest)}</strong>
+      <p>{specs[latest.game].count !== "none" && latest.game !== "taxi" && `${time(latest.durationMs)} · `}#{rank} in this browser {rank === 1 ? "· Personal best!" : "· Keep climbing."}</p>
       <small>{latest.synced ? "Added to the signed-in leaderboard." : latest.attemptId ? "Saved locally · shared ranking pending" : "Saved in this browser. Sign in before your next game to compete with others."}</small>
       {latest.attemptId && !latest.synced && games.player?.id === latest.playerId && <button className="text-button" onClick={() => void games.sync(latest)}>Retry shared ranking <RotateCcw size={13}/></button>}
     </section>}
     {games.notice && <p className="arcade-notice" role="status">{games.notice}</p>}
-    <div className="race-card"><Flag size={27}/><div><h3>Avenue sprint</h3><p>7 checkpoints · {games.localBoard("sprint")[0] ? `Best ${time(games.localBoard("sprint")[0].durationMs)}` : "Your fastest lap wins."}</p></div><button className="round-button" aria-label="Start Avenue sprint" disabled={games.busy || !raceAvailable} onClick={onRace}><ArrowUpRight/></button></div>
-    {!raceAvailable && <p className="arcade-notice">The sprint is available once the 3D world has loaded.</p>}
+    <p className="eyebrow section-label">In the neighbourhood</p>
+    <div className="challenge-list">{challenges.map(({ id, icon: Icon, text }) => <article key={id} className="race-card"><Icon size={25}/><div><h3>{gameNames[id]}</h3><p>{text}</p><small>{best(games.localBoard(id), id)}</small></div><button className="round-button" aria-label={`Start ${gameNames[id]}`} disabled={games.busy || !worldAvailable} onClick={() => onPlay(id)}><ArrowUpRight/></button></article>)}</div>
+    {!worldAvailable && <p className="arcade-notice">These games are available once the 3D world has loaded.</p>}
+    <p className="eyebrow section-label">Quick games</p>
+    <GuessGame games={games} projects={projects} />
     <div className="memory-header"><div><h3>Pattern recognition</h3><p>{phase === "idle" ? "Find six matching pairs. Fewer moves wins." : `${moves} moves · ${matched.length / 2}/6 pairs · ${time(elapsed)}`}</p></div><button className="text-button" disabled={games.busy} onClick={() => void reset()}>{phase !== "idle" ? <RotateCcw size={16}/> : <ArrowUpRight size={16}/>} {phase !== "idle" ? "Restart" : "Play"}</button></div>
     {phase !== "idle" && <div className="memory-stage"><div className="memory-grid">{cards.map((v, i) => <button key={i} aria-label={matched.includes(i) ? `Matched ${v}` : open.includes(i) ? v : `Reveal card ${i + 1}`} className={open.includes(i) || matched.includes(i) ? "revealed" : ""} disabled={phase !== "playing" || matched.includes(i)} onClick={() => flip(i)}>{open.includes(i) || matched.includes(i) ? v : "·"}</button>)}</div>{(phase === "countdown" || (phase === "playing" && elapsed < 500)) && <div className={`memory-countdown ${phase === "playing" ? "is-go" : ""}`} role="status" aria-live="assertive"><small>{phase === "countdown" ? "GET READY" : "FIND YOUR PAIRS"}</small><strong key={phase === "countdown" ? countdown : "go"}>{phase === "countdown" ? countdown : "GO!"}</strong></div>}</div>}
     <section className="scoreboard" aria-label="Game rankings">
       <div className="scoreboard-heading"><div><p className="eyebrow">Your results</p><h3>The leaderboard</h3></div><Trophy size={25}/></div>
-      <div className="game-tabs" aria-label="Choose game">{(Object.keys(gameNames) as Game[]).map(g => <button key={g} aria-pressed={selectedGame === g} onClick={() => setSelectedGame(g)}>{g === "sprint" ? "Avenue sprint" : "Memory"}</button>)}</div>
+      <div className="game-tabs" aria-label="Choose game">{(Object.keys(gameNames) as Game[]).map(g => <button key={g} aria-pressed={selectedGame === g} onClick={() => setSelectedGame(g)}>{tabLabel[g]}</button>)}</div>
       <div className="ranking-tabs" aria-label="Leaderboard scope"><button aria-pressed={scope === "local"} onClick={() => setScope("local")}>This browser <span>{local.length}</span></button><button aria-pressed={scope === "global"} onClick={() => setScope("global")}>Signed-in players</button></div>
-      <p className="ranking-rule">{selectedGame === "memory" ? "Fewest moves, then fastest time." : "Fastest time wins."} {scope === "global" ? "Best result per player." : "Your latest 200 completed games stay on this browser."}</p>
+      <p className="ranking-rule">{rule[selectedGame]} {scope === "global" ? "Best result per player." : "Your latest 200 completed games stay on this browser."}</p>
       {scope === "global" && !board && !boardError && <p className="ranking-empty" role="status">Loading rankings…</p>}
       {boardError && scope === "global" && <p className="ranking-empty" role="alert">{boardError} <button onClick={() => setRefresh(v => v + 1)}>Retry</button></p>}
       {(scope === "local" || board) && !rows.length && <p className="ranking-empty">No scores yet. Finish a game to set the first score.</p>}
-      {!!rows.length && <ol className="score-list">{rows.slice(0, 20).map(s => <li key={s.id} className={s.id === latest?.id || (scope === "global" && s.playerId === games.player?.id) ? "is-you" : ""}><span className="score-rank">#{s.rank}</span><div><strong>{scope === "local" ? (s.id === latest?.id ? "Your latest run" : "Your run") : s.username}</strong><small>{new Date(s.completedAt).toLocaleDateString(undefined, {month:"short",day:"numeric"})} · {new Date(s.completedAt).toLocaleTimeString(undefined, {hour:"2-digit",minute:"2-digit"})}</small></div><strong className="score-value">{selectedGame === "memory" ? <>{s.moves} moves<small>{time(s.durationMs)}</small></> : time(s.durationMs)}</strong></li>)}</ol>}
+      {!!rows.length && <ol className="score-list">{rows.slice(0, 20).map(s => <li key={s.id} className={s.id === latest?.id || (scope === "global" && s.playerId === games.player?.id) ? "is-you" : ""}><span className="score-rank">#{s.rank}</span><div><strong>{scope === "local" ? (s.id === latest?.id ? "Your latest run" : "Your run") : s.username}</strong><small>{new Date(s.completedAt).toLocaleDateString(undefined, {month:"short",day:"numeric"})} · {new Date(s.completedAt).toLocaleTimeString(undefined, {hour:"2-digit",minute:"2-digit"})}</small></div><strong className="score-value">{specs[selectedGame].count !== "none" ? <>{headline(s)}<small>{time(s.durationMs)}</small></> : time(s.durationMs)}</strong></li>)}</ol>}
       {scope === "global" && board?.me && !rows.slice(0,20).some(s => s.playerId === games.player?.id) && <p className="ranking-rule">Your rank: #{board.me.rank} of {board.total} players.</p>}
       {scope === "local" && local.length > 20 && <p className="ranking-rule">Showing your top 20 of {local.length} saved sessions.</p>}
     </section>

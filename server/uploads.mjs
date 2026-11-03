@@ -42,10 +42,14 @@ export function mountUploads(app, { directory, auth, supabase = null }) {
       return res.status(400).json({ error: "Invalid upload." });
     const bucket = supabase.storage.from("project-covers");
     const blob = cloudResult(await bucket.download(req.body.path), "The upload could not be verified. Please try again.");
-    if (blob.size > MAX_IMAGE_BYTES) return res.status(413).json({ error: "Choose an image or GIF up to 8 MB." });
+    // Anything that fails verification is deleted so it can't linger in the public bucket.
+    const reject = async (status, error) => {
+      await bucket.remove([req.body.path]).catch(() => {});
+      return res.status(status).json({ error });
+    };
+    if (blob.size > MAX_IMAGE_BYTES) return reject(413, "Choose an image or GIF up to 8 MB.");
     const bytes = Buffer.from(await blob.arrayBuffer()), type = imageType(bytes);
-    if (!type || !req.body.path.endsWith(`.${type}`))
-      return res.status(400).json({ error: "Choose a valid PNG, JPG, WebP or GIF image." });
+    if (!type || !req.body.path.endsWith(`.${type}`)) return reject(400, "Choose a valid PNG, JPG, WebP or GIF image.");
     res.status(201).json({ url: bucket.getPublicUrl(req.body.path).data.publicUrl, size: bytes.length, type: mimeTypes[type] });
   });
   app.post("/api/uploads", auth, limit, (req, res, next) => {

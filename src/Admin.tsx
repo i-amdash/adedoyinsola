@@ -10,10 +10,11 @@ import {
   LoaderCircle,
 } from "lucide-react";
 import ProjectCoverEditor from "./ProjectCoverEditor";
+import PlayerModeration from "./PlayerModeration";
 import type { Content, Project } from "./types";
 async function request(url: string, options?: RequestInit) {
   const r = await fetch(url, options);
-  const data = await r.json();
+  const data = (r.headers.get("content-type") || "").includes("json") ? await r.json().catch(() => ({})) : { error: "The server is busy. Please try again." };
   if (!r.ok)
     throw new Error(data.details?.join("; ") || data.error || "Request failed");
   return data;
@@ -228,7 +229,7 @@ export default function Admin() {
         <div className="admin-layout">
           <aside className="admin-sidebar">
             <p className="eyebrow">YOUR CONTENT</p>
-            {["Profile", "Projects", "World", "Services"].map((t) => (
+            {["Profile", "Projects", "World", "Services", "Players"].map((t) => (
               <button
                 key={t}
                 className={tab === t ? "active" : ""}
@@ -515,6 +516,7 @@ export default function Admin() {
                   )}
                 </>
               )}
+              {tab === "Players" && <PlayerModeration />}
               {tab === "Services" && (
                 <>
                   <p className="editor-description">

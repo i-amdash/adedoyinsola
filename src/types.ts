@@ -1,3 +1,4 @@
+import type { MissionTelemetry } from "./world/Missions";
 export type Project = {
   id: string;
   title: string;
@@ -95,6 +96,7 @@ export type Telemetry = {
   route?: [number, number][];
   waypoint?: Destination | null;
   car?: [number, number];
+  mission?: MissionTelemetry | null;
 };
 
 export const raceRoute = [

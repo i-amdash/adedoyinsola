@@ -31,6 +31,8 @@ import type { Quality, TimeOfDay } from "./world/Atmosphere";
 import Radar from "./Radar";
 import Joystick from "./Joystick";
 import { bootFinish, bootProgress } from "./boot";
+import { seed as fallbackContent } from "../server/seed.mjs";
+import { timeoutSignal } from "./game/useGames";
 import {
   destinations,
   type Content,
@@ -38,7 +40,7 @@ import {
   type Telemetry,
 } from "./types";
 import Map from "./Map";
-import Arcade from "./Arcade";
+import Arcade, { type WorldGame } from "./Arcade";
 import Projects from "./Projects";
 import { useGames } from "./game/useGames";
 const initial: Telemetry = {
@@ -89,31 +91,54 @@ export default function App() {
   }, [progress, content]);
   useEffect(() => {
     const reveal = () => setRevealed(true);
-    if (error) return bootFinish(reveal);
-    if (!content) return;
-    if (ready) return bootFinish(reveal);
-    // Never hold visitors behind a slow 3D download: the hero reveals after 6s and keeps loading.
+    if (error || (content && ready)) return bootFinish(reveal);
+    // Never hold visitors behind a slow network: after 6s the page reveals with its built-in
+    // text and keeps loading the rest in place.
     const t = setTimeout(() => bootFinish(reveal), 6000);
     return () => clearTimeout(t);
+  }, []);
+  useEffect(() => {
+    if (error || (content && ready)) bootFinish(() => setRevealed(true));
   }, [content, ready, error]);
   const startedRef = useRef(false),
-    lastRace = useRef("idle");
+    lastRace = useRef("idle"),
+    lastMission = useRef("idle");
   useEffect(() => {
-    fetch("/api/content")
-      .then((r) => {
-        if (!r.ok) throw new Error();
-        return r.json();
-      })
-      .then(setContent)
-      .catch(() =>
-        setError(
-          "The content server is unavailable. Please start the backend and reload.",
-        ),
-      );
+    // Content never blocks the site: two short attempts, then the built-in copy.
+    let cancelled = false;
+    const load = async (attempt: number): Promise<void> => {
+      try {
+        const r = await fetch("/api/content", { signal: timeoutSignal(8000) });
+        if (!r.ok || !(r.headers.get("content-type") || "").includes("json")) throw new Error(String(r.status));
+        const data = (await r.json()) as Content;
+        if (!cancelled) setContent(data);
+      } catch {
+        if (cancelled) return;
+        if (attempt === 0) return void setTimeout(() => void load(1), 1500);
+        setContent(JSON.parse(JSON.stringify(fallbackContent)));
+        setToast("Showing a saved copy of this portfolio. Some recent updates may be missing.");
+      }
+    };
+    void load(0);
+    return () => {
+      cancelled = true;
+    };
   }, []);
   useEffect(() => {
     let disposed = false;
-    import("./world/World").then(({ World }) => {
+    // Never trap visitors behind a slow asset: the page is usable after 12s regardless.
+    const giveUp = setTimeout(() => setReady(true), 12000);
+    import("./world/World").catch((e) => {
+      // The 3D code itself failed to download (flaky network, or an old deploy's file).
+      console.error("3D world unavailable", e);
+      if (!disposed) {
+        setWorldError(true);
+        setReady(true);
+      }
+      return null;
+    }).then((mod) => {
+      if (!mod) return;
+      const { World } = mod;
       if (disposed || !host.current) return;
       try {
         const params = new URLSearchParams(location.search);
@@ -124,6 +149,10 @@ export default function App() {
           enter: setPanel,
           map: () => setPanel((p) => (p === "map" ? null : "map")),
           error: () => setWorldError(true),
+          restored: () => {
+            setWorldError(false);
+            setToast("3D graphics are back.");
+          },
           progress: setProgress,
           message: setToast,
           time: setTimeOfDay,
@@ -146,8 +175,6 @@ export default function App() {
           setProgress(1);
           setReady(true);
         };
-        // Never trap visitors behind a slow asset: the world is usable after 12s regardless.
-        setTimeout(() => setReady(true), 12000);
       } catch (e) {
         console.error("World initialization failed", e);
         setWorldError(true);
@@ -156,6 +183,7 @@ export default function App() {
     });
     return () => {
       disposed = true;
+      clearTimeout(giveUp);
       world.current?.dispose();
       world.current = null;
     };
@@ -164,10 +192,16 @@ export default function App() {
     if (world.current) {
       world.current.paused = !!panel;
       world.current.keys.clear();
+      // A thumb may still be on the joystick when a result panel opens.
+      world.current.setStick(0, 0);
     }
     if (panel) {
       previousFocus.current = document.activeElement as HTMLElement;
       closeButton.current?.focus();
+    } else if (startedRef.current) {
+      // While playing, hand focus back to the street so Space brakes instead of
+      // re-pressing the button that opened the panel.
+      host.current?.focus({ preventScroll: true });
     } else previousFocus.current?.focus();
   }, [panel]);
   useEffect(() => {
@@ -200,6 +234,14 @@ export default function App() {
       setPanel("arcade");
     }
     lastRace.current = telemetry.race;
+    const m = telemetry.mission;
+    const phase = m?.phase || "idle";
+    if (m && phase === "finished" && lastMission.current !== "finished") {
+      const result = world.current?.missions.result;
+      if (result) games.finish(m.game, result.durationMs, result.moves);
+      setPanel("arcade");
+    }
+    lastMission.current = phase;
   }, [telemetry, games.finish]);
   useEffect(() => {
     if (!toast) return;
@@ -240,6 +282,12 @@ export default function App() {
       setPanel(d);
       return;
     }
+    const w = world.current;
+    if (w && (w.race === "countdown" || w.race === "running" || w.missions?.active)) {
+      setPanel(null);
+      setToast("Finish or end your current run before fast-travelling.");
+      return;
+    }
     start();
     world.current?.travel(d);
     setPanel(null);
@@ -247,12 +295,19 @@ export default function App() {
       `Arrived at ${destinations.find((x) => x.id === d)?.place}. Tap the place name or press E to open.`,
     );
   }
-  async function startSprint() {
-    if (!world.current || worldError || !ready || !await games.begin("sprint")) return;
+  async function playWorldGame(game: WorldGame) {
+    if (!world.current || worldError || !ready || !await games.begin(game)) return;
     start();
-    world.current.startRace();
+    if (game === "sprint") world.current.startRace();
+    else world.current.startMission(game);
     setPanel(null);
-    setToast("Drive through all 7 green gates. Get ready…");
+    setToast({
+      sprint: "Drive through all 7 green gates. Get ready…",
+      dispatch: "Collect each parcel, then deliver it. Follow the purple line.",
+      taxi: "You have five minutes. Stop in the yellow ring to pick up a passenger.",
+      parking: "Park between the cones and hold still. Scrapes count against you.",
+      hunt: "Find all ten glowing a. tokens. You can walk too: tap Step outside.",
+    }[game]);
   }
   async function toggleAudio() {
     try {
@@ -283,6 +338,10 @@ export default function App() {
     }
   }
   const near = destinations.find((d) => d.id === telemetry.near);
+  const mission = telemetry.mission;
+  const missionLive = !!mission && (mission.phase === "countdown" || mission.phase === "running");
+  const missionLocks = missionLive && mission.game !== "hunt";
+  const clock = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
   function touchKey(key: string, down: boolean) {
     if (down) world.current?.keys.add(key);
     else world.current?.keys.delete(key);
@@ -305,7 +364,7 @@ export default function App() {
           : undefined
       }
     >
-      <div className="world-canvas" ref={host} />
+      <div className="world-canvas" ref={host} tabIndex={-1} aria-label="Palm Avenue, the interactive street" />
       <div className="world-shade" />
       <div className="film-grain" />
       <div className="interface" inert={!!panel}>
@@ -410,6 +469,27 @@ export default function App() {
                 <ChevronRight size={18} />
               </button>
             )}
+            {mission && (mission.phase === "running" || mission.phase === "countdown") && (
+              <div className="race-hud mission-hud">
+                <span>{mission.title}</span>
+                <strong>
+                  {mission.remaining !== undefined ? clock(mission.remaining) : mission.elapsed.toFixed(1)}
+                  {mission.remaining === undefined && <small>s</small>}
+                </strong>
+                <p className="mission-progress">
+                  {mission.game === "taxi" ? `${mission.count} trip${mission.count === 1 ? "" : "s"}` : mission.game === "dispatch" ? `Delivered ${mission.count} / ${mission.total}` : mission.game === "parking" ? `Bay ${Math.min(mission.count + 1, mission.total ?? 3)} / ${mission.total} · ${mission.scrapes} scrape${mission.scrapes === 1 ? "" : "s"}` : `Found ${mission.count} / ${mission.total}`}
+                </p>
+                <p>{mission.hint}</p>
+                <button
+                  onClick={() => {
+                    world.current?.reset();
+                    setToast("Challenge ended. Back to exploring.");
+                  }}
+                >
+                  End challenge
+                </button>
+              </div>
+            )}
             {(telemetry.race === "running" || telemetry.race === "countdown") && (
               <div className="race-hud">
                 <span>AVENUE SPRINT</span>
@@ -443,7 +523,7 @@ export default function App() {
                   }}
                 />
               </div>
-              <button aria-label={telemetry.mode === "drive" ? "Step outside" : "Return to car"} disabled={telemetry.race === "countdown" || telemetry.race === "running"} onClick={() => world.current?.toggleMode()}>
+              <button aria-label={telemetry.mode === "drive" ? "Step outside" : "Return to car"} disabled={telemetry.race === "countdown" || telemetry.race === "running" || missionLocks} onClick={() => world.current?.toggleMode()}>
                 {telemetry.mode === "drive" ? (
                   <Footprints size={16} />
                 ) : (
@@ -559,7 +639,8 @@ export default function App() {
         </footer>
       </div>
       {(telemetry.race === "countdown" || (telemetry.race === "running" && telemetry.elapsed < 0.5)) && !panel && <div className="race-countdown" role="status" aria-live="assertive"><small>AVENUE SPRINT · GET READY</small><strong key={telemetry.race === "countdown" ? telemetry.countdown : "go"}>{telemetry.race === "countdown" ? telemetry.countdown || 3 : "GO!"}</strong><p>W / ↑ to accelerate · A D / ← → to steer</p></div>}
-      {title && started && !panel && telemetry.race === "idle" && (
+      {mission && (mission.phase === "countdown" || (mission.phase === "running" && mission.elapsed < 0.5)) && !panel && <div className="race-countdown" role="status" aria-live="assertive"><small>{mission.title} · GET READY</small><strong key={mission.phase === "countdown" ? mission.countdown : "go"}>{mission.phase === "countdown" ? mission.countdown || 3 : "GO!"}</strong><p>{mission.hint}</p></div>}
+      {title && started && !panel && telemetry.race === "idle" && !missionLive && (
         <div className="arrival-title" aria-hidden="true" key={title}>
           <strong>{destinations.find((d) => d.id === title)?.place}</strong>
           <small>{destinations.find((d) => d.id === title)?.name} · press E</small>
@@ -674,7 +755,7 @@ export default function App() {
                     </>
                   )}
                   {panel === "projects" && <Projects projects={content.projects} onContact={() => setPanel("contact")} />}
-                  {panel === "arcade" && <Arcade games={games} raceAvailable={ready && !worldError} onRace={() => void startSprint()} />}
+                  {panel === "arcade" && <Arcade games={games} worldAvailable={ready && !worldError} projects={content.projects} onPlay={(g) => void playWorldGame(g)} />}
                   {panel === "contact" && (
                     <>
                       <p className="eyebrow">Contact</p>

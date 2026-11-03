@@ -10,6 +10,7 @@ import { SkidMarks, Puffs, Motes } from "./Effects";
 import { Soundscape } from "./Audio";
 import { destinations, raceRoute, type Destination, type Telemetry } from "../types";
 import { route, BOUNDS, LANES } from "./roads";
+import { Missions, type MissionGame } from "./Missions";
 
 const V = THREE.Vector3;
 const damp = THREE.MathUtils.damp;
@@ -25,6 +26,8 @@ export type WorldCallbacks = {
   map: () => void;
   error: () => void;
   progress?: (p: number) => void;
+  /** The browser gave the 3D context back after taking it away (common on iOS). */
+  restored?: () => void;
   message?: (text: string) => void;
   quality?: (q: Quality) => void;
   time?: (t: TimeOfDay) => void;
@@ -77,7 +80,13 @@ export class World {
   pitch = 0.22;
   lastLook = -10;
   shake = 0;
-  dragging: { x: number; y: number } | null = null;
+  dragging: { x: number; y: number; id: number } | null = null;
+  /** Phones and tablets: lighter start-up (people models load when you walk in). */
+  lite = matchMedia("(pointer: coarse)").matches || innerWidth < 820;
+  private crowdRequested = false;
+  private renderedWhilePaused = false;
+  private crashed = false;
+  private resetArmed = -9;
   transition = 1;
   transitionFrom = new V();
   transitionLook = new V();
@@ -98,6 +107,7 @@ export class World {
   checkpoint = 0;
   raceTime = 0;
   gate = new THREE.Group();
+  missions!: Missions;
   quality: Quality;
   adaptive = true;
   fps = { frames: 0, time: 0, low: 0 };
@@ -169,6 +179,7 @@ export class World {
     this.makeLights();
     this.loadCharacters();
     this.makeMarkers();
+    this.missions = new Missions(this);
     this.setQuality(this.quality);
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(host);
@@ -284,6 +295,12 @@ export class World {
     });
     this.walker.visible = false;
     this.scene.add(this.walker);
+    if (!this.lite) this.loadCrowd(loader);
+  }
+  /** Seven extra people models (~10 MB): on phones they load once you walk in. */
+  loadCrowd(loader = new GLTFLoader()) {
+    if (this.crowdRequested || this.disposed) return;
+    this.crowdRequested = true;
     npcModels.forEach((name, i) =>
       loader.load(`/assets/people/${name}.glb`, (gltf: GLTF) => {
         if (!this.disposed) {
@@ -382,7 +399,17 @@ export class World {
         this.cameraMode = (this.cameraMode + 1) % 3;
         this.orbit = 0;
       }
-      if (k === "r") this.reset();
+      if (k === "r") {
+        // A live run (a 5-minute taxi shift, say) needs a second press to throw away.
+        const live = this.race === "countdown" || this.race === "running" || this.missions?.active;
+        if (live && this.time - this.resetArmed > 3) {
+          this.resetArmed = this.time;
+          this.callbacks.message?.("Press R again to end this run.");
+        } else {
+          this.resetArmed = -9;
+          this.reset();
+        }
+      }
     };
     const keyup = (e: KeyboardEvent) => this.keys.delete(e.key.toLowerCase());
     const blur = () => {
@@ -399,28 +426,40 @@ export class World {
     window.addEventListener("blur", blur);
     document.addEventListener("visibilitychange", visibility);
     const canvas = this.renderer.domElement;
+    // Only the first finger steers the camera; a second finger can't make it jump.
     const pd = (e: PointerEvent) => {
-      this.dragging = { x: e.clientX, y: e.clientY };
+      if (this.dragging) return;
+      this.dragging = { x: e.clientX, y: e.clientY, id: e.pointerId };
       canvas.setPointerCapture(e.pointerId);
     };
     const pm = (e: PointerEvent) => {
-      if (!this.dragging) return;
+      if (!this.dragging || e.pointerId !== this.dragging.id) return;
       this.orbit -= (e.clientX - this.dragging.x) * 0.006;
       this.pitch = THREE.MathUtils.clamp(this.pitch + (e.clientY - this.dragging.y) * 0.004, -0.05, 0.85);
-      this.dragging = { x: e.clientX, y: e.clientY };
+      this.dragging = { x: e.clientX, y: e.clientY, id: e.pointerId };
       this.lastLook = this.time;
     };
-    const pu = () => (this.dragging = null);
+    const pu = (e: PointerEvent) => {
+      if (this.dragging?.id === e.pointerId) this.dragging = null;
+    };
     const lost = (e: Event) => {
       e.preventDefault();
       this.onError();
+    };
+    const restored = () => {
+      // three.js re-uploads resources itself; rebuild render targets for the current quality.
+      this.setQuality(this.quality);
+      this.renderedWhilePaused = false;
+      this.callbacks.restored?.();
     };
     canvas.addEventListener("pointerdown", pd);
     canvas.addEventListener("pointermove", pm);
     canvas.addEventListener("pointerup", pu);
     canvas.addEventListener("pointercancel", pu);
     canvas.addEventListener("webglcontextlost", lost);
+    canvas.addEventListener("webglcontextrestored", restored);
     this.cleanup.push(() => {
+      canvas.removeEventListener("webglcontextrestored", restored);
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", keyup);
       window.removeEventListener("blur", blur);
@@ -435,6 +474,7 @@ export class World {
 
   // ---------------------------------------------------------------- public API
   enter() {
+    this.loadCrowd();
     if (!this.active) {
       this.active = true;
       this.transition = 0;
@@ -478,6 +518,7 @@ export class World {
     this.orbit = 0;
     this.race = "idle";
     this.gate.visible = false;
+    this.missions?.cancel();
   }
   setStick(x: number, y: number) {
     const m = Math.hypot(x, y);
@@ -488,6 +529,10 @@ export class World {
   toggleMode() {
     if (this.race === "countdown" || this.race === "running") {
       this.callbacks.message?.("Finish or end the sprint before stepping out.");
+      return;
+    }
+    if (this.missions?.locksCar) {
+      this.callbacks.message?.("Stay behind the wheel until this challenge is over.");
       return;
     }
     if (this.mode === "drive") {
@@ -544,9 +589,29 @@ export class World {
     this.orbit = 0;
     this.race = "idle";
     this.gate.visible = false;
+    this.missions?.cancel();
     if (this.waypoint === id) this.waypoint = null;
     this.enter();
     this.transition = 1;
+  }
+  /** Current speed of whichever body you control, in m/s. */
+  speedNow() {
+    return this.mode === "drive" ? this.velocity.length() : this.walkSpeed;
+  }
+  free(x: number, z: number, r: number, onFoot: boolean) {
+    return !this.blocked(new V(x, 0, z), r, false, onFoot);
+  }
+  startMission(game: MissionGame) {
+    this.reset();
+    const [x, z, yaw] = Missions.startPose(game);
+    this.position.set(x, 0, z);
+    this.yaw = yaw;
+    this.camHeading = yaw;
+    this.car.position.copy(this.position);
+    this.car.rotation.set(0, yaw, 0);
+    this.missions.start(game);
+    this.routeAge = 99;
+    this.enter();
   }
   startRace() {
     this.reset();
@@ -681,6 +746,7 @@ export class World {
         this.velocity.x *= -0.15;
         this.velocity.z *= 0.85;
       } else this.velocity.multiplyScalar(-0.2);
+      this.missions?.onImpact(impact);
       if (impact > 6) {
         this.shake = Math.min(1, impact / 25);
         this.sound?.blip(110);
@@ -901,6 +967,15 @@ export class World {
   }
 
   updateRoute() {
+    const goal = this.missions?.active ? this.missions.target : null;
+    if (goal) {
+      this.routePoints = route([this.focus.x, this.focus.z], [goal.x, goal.z]);
+      return;
+    }
+    if (this.missions?.active) {
+      this.routePoints = [];
+      return;
+    }
     if (!this.waypoint) {
       this.routePoints = [];
       return;
@@ -914,13 +989,26 @@ export class World {
   }
 
   animate = () => {
-    if (this.disposed) return;
+    if (this.disposed || this.crashed) return;
     this.raf = requestAnimationFrame(this.animate);
     const real = this.clock.getDelta();
     if (document.hidden) return;
-    this.adaptQuality(real);
-    this.tick(real);
-    this.atmosphere.render();
+    // Behind an open panel the scene is frozen and blurred: draw one frame, then rest the GPU.
+    if (this.paused) {
+      if (this.renderedWhilePaused) return;
+      this.renderedWhilePaused = true;
+    } else this.renderedWhilePaused = false;
+    try {
+      this.adaptQuality(real);
+      this.tick(real);
+      this.atmosphere.render();
+    } catch (e) {
+      // Never loop on a frozen frame: stop, report once, and let the page fall back.
+      this.crashed = true;
+      cancelAnimationFrame(this.raf);
+      console.error("3D world stopped", e);
+      this.onError();
+    }
   };
   /** Advance the simulation without rendering (used by automated checks). */
   step(frames: number, dt = 1 / 60) {
@@ -945,11 +1033,16 @@ export class World {
       const s = 1 + (this.reduced ? 0 : Math.sin(this.time * 2.4 + i) * 0.04);
       m.ring.scale.setScalar(s);
       ((m.group.children[0] as THREE.Mesh).material as THREE.ShaderMaterial).uniforms.time.value = this.time;
-      m.group.visible = this.race !== "running" && this.race !== "countdown";
+      m.group.visible = this.race !== "running" && this.race !== "countdown" && !this.missions?.active;
     }
     if (this.active && !this.paused && !document.hidden) {
       const racing = this.race === "running";
-      if (this.race === "countdown") {
+      const missionCountdown = this.missions?.phase === "countdown";
+      if (missionCountdown) {
+        this.velocity.set(0, 0, 0);
+        this.car.position.copy(this.position);
+        this.car.rotation.set(0, this.yaw, 0);
+      } else if (this.race === "countdown") {
         this.countdown = Math.max(0, this.countdown - dt);
         this.velocity.set(0, 0, 0);
         this.car.position.copy(this.position);
@@ -960,6 +1053,8 @@ export class World {
       this.near = null;
       const f = this.focus;
       for (const d of destinations) if (Math.hypot(f.x - d.x, f.z - d.z) < (this.mode === "walk" ? 4.5 : 12)) this.near = d.id;
+      if (this.missions?.active) this.near = null;
+      this.missions?.update(dt);
       if (racing) {
         this.raceTime += dt;
         const p = raceRoute[this.checkpoint];
@@ -990,7 +1085,7 @@ export class World {
     if (this.active) this.atmosphere.fade = 1;
     if (!this.reduced) this.motes.update(this.time, this.camera, this.atmosphere.sunDirection, this.atmosphere.sun.color, night);
     this.atmosphere.update(dt, this.time, this.active ? this.focus : this.introFocus);
-    if (this.time - this.lastPublish > 0.1) {
+    if (!this.paused && this.time - this.lastPublish > 0.1) {
       this.lastPublish = this.time;
       const f = this.focus;
       this.onUpdate({
@@ -1008,12 +1103,14 @@ export class World {
         route: this.routePoints,
         waypoint: this.waypoint,
         car: [this.position.x, this.position.z],
+        mission: this.missions?.telemetry() ?? null,
       });
     }
   }
 
   adaptQuality(real: number) {
-    if (!this.active || this.paused || !this.adaptive) return;
+    // Runs on the intro screen too, where most visitors stay, so slow phones step down early.
+    if (this.paused || !this.adaptive) return;
     this.fps.frames++;
     this.fps.time += real;
     if (this.fps.time < 4) return;
@@ -1036,6 +1133,7 @@ export class World {
     this.observer.disconnect();
     this.cleanup.forEach((fn) => fn());
     this.district.dispose();
+    this.missions?.dispose();
     this.traffic.dispose();
     this.crowd.dispose();
     this.skids.dispose();
@@ -1046,6 +1144,10 @@ export class World {
       materials = new Set<THREE.Material>(),
       textures = new Set<THREE.Texture>();
     this.scene.traverse((obj) => {
+      if (obj instanceof THREE.Sprite) {
+        materials.add(obj.material);
+        if (obj.material.map) textures.add(obj.material.map);
+      }
       if (obj instanceof THREE.Mesh) {
         geometries.add(obj.geometry);
         for (const m of Array.isArray(obj.material) ? obj.material : [obj.material]) {
@@ -1059,6 +1161,7 @@ export class World {
     textures.forEach((t) => t.dispose());
     this.atmosphere.dispose();
     this.renderer.dispose();
+    this.renderer.forceContextLoss();
     this.renderer.domElement.remove();
   }
 }

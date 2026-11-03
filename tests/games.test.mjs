@@ -76,3 +76,35 @@ test("local sessions share deterministic ordering and reject corrupt scores", ()
   assert.deepEqual(rankScores(scores).map(s=>[s.id,s.rank]),[["c",1],["d",1],["b",3],["a",4]]);
   for (const s of [{game:"unknown",durationMs:10},{game:"sprint",durationMs:NaN},{game:"memory",durationMs:5000,moves:2},{game:"sprint",durationMs:30000,moves:6}]) assert.equal(validScore(s),false);
 });
+
+test("every game validates its own score shape and ranks in the right direction", () => {
+  const at = "2026-11-03T00:00:00Z";
+  assert.ok(validScore({ game: "taxi", durationMs: 250000, moves: 12 }));
+  assert.equal(validScore({ game: "taxi", durationMs: 301000, moves: 12 }), false, "taxi ends at five minutes");
+  assert.equal(validScore({ game: "taxi", durationMs: 250000 }), false);
+  assert.ok(validScore({ game: "parking", durationMs: 40000, moves: 0 }));
+  assert.equal(validScore({ game: "parking", durationMs: 4000, moves: 0 }), false);
+  assert.ok(validScore({ game: "hunt", durationMs: 90000 }));
+  assert.equal(validScore({ game: "hunt", durationMs: 90000, moves: 3 }), false);
+  assert.ok(validScore({ game: "guess", durationMs: 60000, moves: 5400 }));
+  assert.equal(validScore({ game: "guess", durationMs: 60000, moves: 9000 }), false);
+  const taxi = rankScores([
+    { id: "a", game: "taxi", durationMs: 280000, moves: 9, completedAt: at },
+    { id: "b", game: "taxi", durationMs: 290000, moves: 11, completedAt: at },
+    { id: "c", game: "taxi", durationMs: 250000, moves: 11, completedAt: at },
+  ]);
+  assert.deepEqual(taxi.map((s) => s.id), ["c", "b", "a"], "more trips first, then the earlier last drop");
+  const parking = rankScores([
+    { id: "a", game: "parking", durationMs: 30000, moves: 2, completedAt: at },
+    { id: "b", game: "parking", durationMs: 50000, moves: 0, completedAt: at },
+  ]);
+  assert.deepEqual(parking.map((s) => s.id), ["b", "a"], "fewer scrapes beat a faster time");
+});
+
+test("impossible results are rejected even when the shape is valid", () => {
+  assert.equal(validScore({ game: "guess", durationMs: 4400, moves: 8000 }), false, "8,000 points needs 8 rounds");
+  assert.ok(validScore({ game: "guess", durationMs: 9000, moves: 8000 }));
+  assert.equal(validScore({ game: "taxi", durationMs: 30000, moves: 20 }), false, "20 trips in 30 s");
+  assert.equal(validScore({ game: "dispatch", durationMs: 25000 }), false);
+  assert.equal(validScore({ game: "memory", durationMs: 1500, moves: 6 }), false);
+});

@@ -7,7 +7,7 @@ import { randomUUID, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
-import { compareScores, rankScores, validScore, gameNames } from "../shared/games.mjs";
+import { compareScores, rankScores, validScore, gameNames, usesCount } from "../shared/games.mjs";
 const derive = promisify(scrypt);
 const credentials = z.object({ username: z.string().trim().regex(/^[a-zA-Z0-9_]{3,24}$/, "Use 3–24 letters, numbers or underscores"), password: z.string().min(10).max(128) });
 const fail = (status, message) => Object.assign(new Error(message), { status });
@@ -41,7 +41,7 @@ export function createPlayerStore(directory) {
   }
   return { read, update };
 }
-export function mountPlayers(app, { directory, production, now = Date.now, supabase = null }) {
+export function mountPlayers(app, { directory, production, now = Date.now, supabase = null, adminAuth }) {
   const store = createPlayerStore(directory), sessions = createSessions(supabase, now);
   const cloud = supabase ? createCloudPlayers(supabase, now) : null;
   const cookie = production ? "__Host-avenue_player" : "avenue_player";
@@ -99,13 +99,38 @@ export function mountPlayers(app, { directory, production, now = Date.now, supab
       const a = data.attempts.find(a => a.id === attemptId && a.playerId === req.player.id && a.game === game);
       if (!a || a.expires <= now()) throw fail(409, "This ranked attempt has expired. Start a new game.");
       if (now() - a.startsAt + 500 < durationMs) throw fail(400, "The game has not run long enough for this result.");
-      const result = { id: a.id, playerId: req.player.id, game, durationMs, ...(game === "memory" ? { moves } : {}), completedAt: new Date(now()).toISOString() };
+      const result = { id: a.id, playerId: req.player.id, game, durationMs, ...(usesCount(game) ? { moves } : {}), completedAt: new Date(now()).toISOString() };
       data.scores.push(result);
       data.attempts = data.attempts.filter(other => other.id !== a.id);
       return result;
     });
     res.json({ score });
   });
+  // Moderation: the admin can find and remove a player (their scores and sessions go too).
+  if (adminAuth) {
+    app.get("/api/admin/players", adminAuth, async (req, res) => {
+      const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 24) : "";
+      if (q && !/^[a-zA-Z0-9_]+$/.test(q)) return res.json({ players: [] });
+      if (cloud) return res.json({ players: await cloud.listPlayers(q) });
+      const data = await store.read();
+      const players = data.players
+        .filter((p) => !q || p.username.toLowerCase().includes(q.toLowerCase()))
+        .slice(-50).reverse()
+        .map((p) => ({ ...publicPlayer(p), scores: data.scores.filter((s) => s.playerId === p.id).length }));
+      res.json({ players });
+    });
+    app.post("/api/admin/players/remove", adminAuth, async (req, res) => {
+      const id = req.body?.id;
+      if (typeof id !== "string" || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(id)) throw fail(400, "Unknown player.");
+      if (cloud) await cloud.removePlayer(id);
+      else await store.update((data) => {
+        data.players = data.players.filter((p) => p.id !== id);
+        data.scores = data.scores.filter((s) => s.playerId !== id);
+        data.attempts = data.attempts.filter((a) => a.playerId !== id);
+      });
+      res.json({ ok: true });
+    });
+  }
   app.get("/api/games/leaderboard", async (req, res) => {
     const game = req.query.game;
     if (typeof game !== "string" || !Object.hasOwn(gameNames, game)) throw fail(400, "Unknown game.");

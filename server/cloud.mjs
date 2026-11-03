@@ -12,7 +12,9 @@ export function createCloud(env = process.env) {
     return null;
   }
   if (!url || !/^https:\/\//.test(url)) throw new Error("Set a valid HTTPS SUPABASE_URL.");
-  return createClient(url, secret, { auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false } });
+  // A paused or unreachable project must fail fast, not hold a serverless function for 30s.
+  const timed = (input, init = {}) => fetch(input, { ...init, signal: init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(8000)]) : AbortSignal.timeout(8000) });
+  return createClient(url, secret, { auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false }, global: { fetch: timed } });
 }
 export function cloudResult({ data, error }, message = "Database unavailable. Please try again.") {
   if (error) {

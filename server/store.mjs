@@ -57,16 +57,45 @@ export const contentSchema = z.object({
     .array(z.object({ title: text.max(100), description: text }))
     .max(20),
 });
+/**
+ * Rebuild a stored document that no longer matches the schema (an older format, or an edit
+ * made directly in the database) section by section, so the site and admin keep working.
+ */
+export function repairContent(raw) {
+  const exact = contentSchema.safeParse(raw);
+  if (exact.success) return { content: exact.data, repaired: false };
+  const doc = raw && typeof raw === "object" ? raw : {};
+  const shape = contentSchema.shape;
+  const pick = (key) => {
+    const r = shape[key].safeParse(doc[key]);
+    return r.success ? r.data : structuredClone(seed[key]);
+  };
+  const project = shape.projects.element ?? shape.projects.def?.element ?? shape.projects._def?.innerType?.element;
+  const seen = new Set();
+  const projects = (Array.isArray(doc.projects) ? doc.projects : [])
+    .map((p) => project?.safeParse(p))
+    .filter((r) => r?.success && !seen.has(r.data.id) && seen.add(r.data.id))
+    .map((r) => r.data)
+    .slice(0, 50);
+  const content = {
+    revision: Number.isInteger(doc.revision) && doc.revision > 0 ? doc.revision : seed.revision,
+    profile: pick("profile"),
+    projects: projects.length ? projects : structuredClone(seed.projects),
+    world: pick("world"),
+    services: pick("services"),
+  };
+  return { content: contentSchema.parse(content), repaired: true };
+}
 export function createStore(directory, client = null) {
   const file = path.join(directory, "content.json");
   let queue = Promise.resolve();
   async function read() {
     if (client) {
       const row = cloudResult(await client.from("portfolio_content").select("document").eq("id", "main").maybeSingle());
-      return row ? contentSchema.parse(row.document) : structuredClone(seed);
+      return row ? repairContent(row.document).content : structuredClone(seed);
     }
     try {
-      return contentSchema.parse(JSON.parse(await readFile(file, "utf8")));
+      return repairContent(JSON.parse(await readFile(file, "utf8"))).content;
     } catch (e) {
       if (e.code === "ENOENT") return structuredClone(seed);
       throw e;

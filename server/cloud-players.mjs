@@ -18,6 +18,15 @@ export function createCloudPlayers(client, now = Date.now) {
       const row = cloudResult(await client.rpc("portfolio_finish_game", { p_player: playerId, p_attempt: attemptId, p_game: game, p_duration: durationMs, p_moves: moves ?? null }));
       return { id: row.id, playerId: row.player_id, game: row.game, durationMs: row.duration_ms, ...(row.moves === null ? {} : { moves: row.moves }), completedAt: row.completed_at };
     },
+    async listPlayers(q) {
+      let query = client.from("portfolio_players").select("id,username,created_at").order("created_at", { ascending: false }).limit(50);
+      if (q) query = query.ilike("username_key", `%${q.toLowerCase()}%`);
+      return cloudResult(await query).map(({ id, username }) => ({ id, username }));
+    },
+    async removePlayer(id) {
+      // Scores, attempts and sessions cascade.
+      cloudResult(await client.from("portfolio_players").delete().eq("id", id));
+    },
     async leaderboard(game, playerId) {
       return cloudResult(await client.rpc("portfolio_leaderboard", { p_game: game, p_player: playerId || null }));
     },

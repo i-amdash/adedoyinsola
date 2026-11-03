@@ -5,7 +5,8 @@ import { rateLimit } from "express-rate-limit";
 import { createSessions } from "./sessions.mjs";
 import { cloudResult, rateOptions } from "./cloud.mjs";
 import { createStore } from "./store.mjs";
-import { verifyPassword } from "./auth.mjs";
+import { verifyPassword, hashFingerprint } from "./auth.mjs";
+import { seed } from "./seed.mjs";
 export function createApp({
   directory,
   passwordHash,
@@ -30,11 +31,26 @@ export function createApp({
     if (production)
       res.set(
         "Content-Security-Policy",
-        `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; connect-src 'self' blob: data: ${supabase ? new URL(supabase.supabaseUrl).origin : ''}; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'`,
+        `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; connect-src 'self' blob: data: https://*.supabase.co; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'`,
       );
     next();
   });
-  app.use("/api", express.json({ limit: "512kb" }));
+  // Compressed request bodies are never needed; refusing them also closes body-parser's
+  // decompression DoS path.
+  app.use("/api", express.json({ limit: "1mb", inflate: false }));
+  // Cheap per-instance cap on public reads (leaderboards, content, sessions). Writes have
+  // their own database-backed limits.
+  app.use(
+    "/api",
+    rateLimit({
+      windowMs: 60 * 1000,
+      limit: 240,
+      standardHeaders: true,
+      legacyHeaders: false,
+      skip: (req) => req.method !== "GET",
+      message: { error: "Too many requests. Please slow down." },
+    }),
+  );
   app.use("/api", (req, res, next) => {
     res.set("Cache-Control", "no-store");
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
@@ -50,13 +66,21 @@ export function createApp({
     next();
   });
   const cookieName = production ? "__Host-doyin_session" : "doyin_session";
-  function session(req) {
+  // The cookie carries the session token plus a fingerprint of the current password hash,
+  // so rotating ADMIN_PASSWORD_HASH signs every existing admin session out.
+  const fingerprint = hashFingerprint(passwordHash);
+  function cookieToken(req) {
     const raw = req.headers.cookie
       ?.split(";")
       .find((v) => v.trim().startsWith(cookieName + "="))
       ?.trim()
       .slice(cookieName.length + 1);
-    return sessions.read(raw, "admin");
+    const [token, mark] = (raw || "").split(".");
+    return { token, valid: !!passwordHash && mark === fingerprint };
+  }
+  async function session(req) {
+    const { token, valid } = cookieToken(req);
+    return valid ? sessions.read(token, "admin") : null;
   }
   async function auth(req, res, next) {
     if (!await session(req)) return res.status(401).json({ error: "Please sign in" });
@@ -67,11 +91,18 @@ export function createApp({
     if (supabase) cloudResult(await supabase.from("portfolio_content").select("id").limit(1));
     res.json({ ok: true, storage: supabase ? "supabase" : "local" });
   });
+  // Last content served successfully by this instance; used if the database is unreachable
+  // (for example a paused Supabase project) so the public site keeps working.
+  let lastGood = null;
   app.get("/api/content", async (_req, res, next) => {
     try {
-      res.json(await store.read());
+      lastGood = await store.read();
+      res.json(lastGood);
     } catch (e) {
-      next(e);
+      if ((e.status || 500) < 500) return next(e);
+      console.error("Content unavailable, serving fallback:", e.message);
+      res.set("X-Content-Source", lastGood ? "cache" : "built-in");
+      res.json(lastGood || structuredClone(seed));
     }
   });
   app.get("/api/auth/session", async (req, res) =>
@@ -97,11 +128,11 @@ export function createApp({
       if (
         typeof req.body?.password !== "string" ||
         req.body.password.length > 512 ||
-        !verifyPassword(req.body.password, passwordHash)
+        !(await verifyPassword(req.body.password, passwordHash))
       )
         return res.status(401).json({ error: "Incorrect password" });
       const id = await sessions.issue("admin", null, 8 * 60 * 60 * 1000);
-      res.cookie(cookieName, id, {
+      res.cookie(cookieName, `${id}.${fingerprint}`, {
         httpOnly: true,
         secure: production,
         sameSite: "strict",
@@ -112,12 +143,7 @@ export function createApp({
     },
   );
   app.post("/api/auth/logout", async (req, res) => {
-    const raw = req.headers.cookie
-      ?.split(";")
-      .find((v) => v.trim().startsWith(cookieName + "="))
-      ?.trim()
-      .slice(cookieName.length + 1);
-    await sessions.revoke(raw);
+    await sessions.revoke(cookieToken(req).token);
     res.clearCookie(cookieName, {
       httpOnly: true,
       secure: production,
@@ -133,7 +159,7 @@ export function createApp({
       next(e);
     }
   });
-  mountPlayers(app, { directory, production, now, supabase });
+  mountPlayers(app, { directory, production, now, supabase, adminAuth: auth });
   app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));
   if (staticDirectory) {
     app.use(express.static(staticDirectory));
@@ -141,9 +167,15 @@ export function createApp({
       res.sendFile(staticDirectory + "/index.html"),
     );
   }
-  app.use((err, _req, res, _next) => {
+  app.use((err, req, res, _next) => {
     if (err.type === "entity.too.large")
-      return res.status(413).json({ error: "File is too large. Choose an image or GIF smaller than 8 MB." });
+      return res.status(413).json({
+        error: req.path.startsWith("/api/uploads")
+          ? "File is too large. Choose an image or GIF smaller than 8 MB."
+          : "This is too large to save. Shorten some of the text and try again.",
+      });
+    if (err.type === "encoding.unsupported")
+      return res.status(415).json({ error: "Compressed requests aren't supported." });
     if (err.name === "ZodError")
       return res
         .status(400)
