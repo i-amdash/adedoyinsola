@@ -67,6 +67,19 @@ create table if not exists public.portfolio_rate_limits (
   expires_at timestamptz not null
 );
 create index if not exists portfolio_rate_limits_expiry on public.portfolio_rate_limits (expires_at);
+-- Project requests sent from the /build configurator. The document holds the answers,
+-- the server-calculated estimate and the contact details.
+create table if not exists public.portfolio_requests (
+  id uuid primary key,
+  reference text not null unique,
+  status text not null default 'new',
+  created_at timestamptz not null default now(),
+  document jsonb not null
+);
+alter table public.portfolio_requests drop constraint if exists portfolio_requests_status_valid;
+alter table public.portfolio_requests add constraint portfolio_requests_status_valid
+  check (status in ('new', 'contacted', 'won', 'lost', 'archived'));
+create index if not exists portfolio_requests_recent on public.portfolio_requests (created_at desc);
 
 alter table public.portfolio_content enable row level security;
 alter table public.portfolio_players enable row level security;
@@ -74,10 +87,12 @@ alter table public.portfolio_attempts enable row level security;
 alter table public.portfolio_scores enable row level security;
 alter table public.portfolio_sessions enable row level security;
 alter table public.portfolio_rate_limits enable row level security;
+alter table public.portfolio_requests enable row level security;
 revoke all on public.portfolio_content, public.portfolio_players, public.portfolio_attempts,
-  public.portfolio_scores, public.portfolio_sessions, public.portfolio_rate_limits from anon, authenticated;
+  public.portfolio_scores, public.portfolio_sessions, public.portfolio_rate_limits, public.portfolio_requests from anon, authenticated;
 grant select, insert, update, delete on public.portfolio_content, public.portfolio_players,
-  public.portfolio_attempts, public.portfolio_scores, public.portfolio_sessions, public.portfolio_rate_limits to service_role;
+  public.portfolio_attempts, public.portfolio_scores, public.portfolio_sessions, public.portfolio_rate_limits,
+  public.portfolio_requests to service_role;
 
 -- Atomic attempt completion prevents duplicate/replayed results across functions.
 create or replace function public.portfolio_finish_game(p_player uuid, p_attempt uuid, p_game text, p_duration integer, p_moves integer default null)

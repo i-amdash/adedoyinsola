@@ -1,3 +1,5 @@
+import type { Catalog } from "../shared/builder.mjs";
+export type { Catalog };
 import type { MissionTelemetry } from "./world/Missions";
 export type Project = {
   id: string;
@@ -32,8 +34,9 @@ export type Content = {
     accent: string;
   };
   services: { title: string; description: string }[];
+  builder: Catalog;
 };
-export type Destination = "about" | "projects" | "arcade" | "contact";
+export type Destination = "about" | "projects" | "arcade" | "build" | "contact";
 export const destinations: {
   id: Destination;
   name: string;
@@ -69,6 +72,15 @@ export const destinations: {
     z: -88,
     color: "#c6b7f3",
     symbol: "✦",
+  },
+  {
+    id: "build",
+    name: "Build yours",
+    place: "The Workshop",
+    x: 14,
+    z: 16,
+    color: "#ff9f6e",
+    symbol: "✎",
   },
   {
     id: "contact",

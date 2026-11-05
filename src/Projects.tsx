@@ -85,7 +85,7 @@ export default function Projects({ projects, onContact }: { projects: Project[];
       </article>
       <div className="gallery-pagination"><span>Browse projects</span><div><button className="round-button" aria-label="Previous project" disabled={filtered.length < 2} onClick={() => setSelected(filtered[(index-1+filtered.length)%filtered.length].id)}><ChevronLeft size={18}/></button><button className="round-button" aria-label="Next project" disabled={filtered.length < 2} onClick={() => setSelected(filtered[(index+1)%filtered.length].id)}><ChevronRight size={18}/></button></div></div>
       <div className="project-selector" aria-label="Choose project">{filtered.map((p) => <button key={p.id} aria-pressed={p.id === project.id} onClick={() => setSelected(p.id)}><strong>{p.title}<small>{p.category}</small></strong><ArrowUpRight size={17}/></button>)}</div>
-      <div className="gallery-contact"><p>Have an idea of your own? Let’s bring it to life.</p><button className="text-button" onClick={onContact}>Start your project <ArrowUpRight size={16}/></button></div>
+      <div className="gallery-contact"><p>Have an idea of your own? Design it and see the price.</p><a className="text-button" href="/build">Build yours <ArrowUpRight size={16}/></a></div>
     </> : <p className="ranking-empty">No projects in this category yet.</p>}
   </div>;
 }

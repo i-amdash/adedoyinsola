@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import ProjectCoverEditor from "./ProjectCoverEditor";
 import PlayerModeration from "./PlayerModeration";
+import AdminRequests from "./AdminRequests";
+import AdminPricing from "./AdminPricing";
 import type { Content, Project } from "./types";
 async function request(url: string, options?: RequestInit) {
   const r = await fetch(url, options);
@@ -85,7 +87,8 @@ export default function Admin() {
       const data = await request("/api/content", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(content),
+        // Blank lines in "always included" lists are only typing leftovers.
+        body: JSON.stringify(content && { ...content, builder: { ...content.builder, products: content.builder.products.map((p) => ({ ...p, includes: p.includes.map((x) => x.trim()).filter(Boolean) })) } }),
       });
       setContent(data);
       setDirty(false);
@@ -229,7 +232,7 @@ export default function Admin() {
         <div className="admin-layout">
           <aside className="admin-sidebar">
             <p className="eyebrow">YOUR CONTENT</p>
-            {["Profile", "Projects", "World", "Services", "Players"].map((t) => (
+            {["Profile", "Projects", "World", "Services", "Requests", "Pricing", "Players"].map((t) => (
               <button
                 key={t}
                 className={tab === t ? "active" : ""}
@@ -517,6 +520,19 @@ export default function Admin() {
                 </>
               )}
               {tab === "Players" && <PlayerModeration />}
+              {tab === "Requests" && <AdminRequests content={content} />}
+              {tab === "Pricing" && (
+                <AdminPricing
+                  builder={content.builder}
+                  onChange={(fn) =>
+                    edit((c) => {
+                      const builder = structuredClone(c.builder);
+                      fn(builder);
+                      return { ...c, builder };
+                    })
+                  }
+                />
+              )}
               {tab === "Services" && (
                 <>
                   <p className="editor-description">

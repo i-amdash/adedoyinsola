@@ -1,3 +1,4 @@
+import { defaultBuilder } from "../shared/builder.mjs";
 export const seed = {
   revision: 1,
   profile: {
@@ -238,4 +239,5 @@ export const seed = {
       description: "Put your business in your customers’ hands with intuitive iOS and Android apps, built with Flutter and React Native.",
     },
   ],
+  builder: structuredClone(defaultBuilder),
 };

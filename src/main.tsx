@@ -6,8 +6,11 @@ import { bootRemove } from "./boot";
 
 // Visitors never download the admin studio; it loads only on /admin.
 const Admin = lazy(() => import("./Admin"));
+// The project builder is its own light page: no 3D world is loaded there.
+const Build = lazy(() => import("./build/Build"));
 const isAdmin = location.pathname.startsWith("/admin");
-if (isAdmin) bootRemove();
+const isBuild = /^\/build\/?$/.test(location.pathname);
+if (isAdmin || isBuild) bootRemove();
 
 /** If anything throws while rendering, show a calm fallback instead of a blank page. */
 class Boundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
@@ -40,6 +43,10 @@ createRoot(document.getElementById("root")!).render(
       {isAdmin ? (
         <Suspense fallback={<main className="admin-loading">Loading the studio…</main>}>
           <Admin />
+        </Suspense>
+      ) : isBuild ? (
+        <Suspense fallback={<main className="admin-loading">Loading the project builder…</main>}>
+          <Build />
         </Suspense>
       ) : (
         <App />

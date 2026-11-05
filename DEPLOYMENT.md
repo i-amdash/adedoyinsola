@@ -24,10 +24,19 @@ Add these environment variables in Vercel for the environments you intend to dep
 | `SUPABASE_SECRET_KEY` | Your server-only secret from the local `.env` |
 | `ADMIN_PASSWORD_HASH` | The existing complete hash from the local `.env` |
 | `DATA_BACKEND` | `supabase` |
+| `RESEND_API_KEY` | Optional. From resend.com, so each project request is emailed to you with its PDF brief |
+| `NOTIFY_EMAIL` | Optional. Where requests go (defaults to the email in your profile) |
+| `NOTIFY_FROM` | Optional. A sender on a domain you verified in Resend, e.g. `Projects <hello@yourdomain.com>` |
 
 Do not set `DATA_DIR`, `PORT`, `HOST`, or a public-prefixed secret on Vercel. `.env` is ignored and will not automatically become Vercel environment variables. Keep preview environments pointed at a separate Supabase project if preview edits should not affect live content. If you change the Supabase project, also update the `connect-src` origin in `vercel.json`.
 
 The admin and player sign-ins use the existing application accounts and secure cookies, backed by Supabase tables. They are separate from Supabase Auth, so OAuth redirect URL setup and `@supabase/ssr` are not needed. Password reset/email recovery is not implemented.
+
+## Project builder (/build)
+
+Visitors design a website, store, platform or app at `/build`, see a live preview and estimate, and send you the brief. Requests are saved in the `portfolio_requests` table (rerun `supabase/setup.sql` once to create it) and appear under **Requests** in the admin studio; prices are edited under **Pricing** and saved with the rest of your content.
+
+Email is optional. Without `RESEND_API_KEY` requests are still saved. With Resend's test sender (`onboarding@resend.dev`, the default when `NOTIFY_FROM` is unset) Resend only delivers to the email address of your Resend account, so set `NOTIFY_EMAIL` to that address or verify your own domain and set `NOTIFY_FROM`.
 
 ## Verify before sharing
 

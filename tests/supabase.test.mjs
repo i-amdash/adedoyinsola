@@ -22,7 +22,7 @@ test("the Supabase SQL enforces private access, atomic game completion and share
   const query = async (sql, params = []) => (await db.query(sql, params)).rows;
   await t.test("every app table has RLS and denies public reads and writes", async () => {
     const tables = await query("select tablename, rowsecurity from pg_tables where schemaname='public'");
-    assert.equal(tables.length, 6);
+    assert.equal(tables.length, 7);
     for (const { tablename, rowsecurity } of tables) {
       assert.equal(rowsecurity, true);
       for (const role of ["anon", "authenticated"]) for (const grant of ["SELECT", "INSERT", "UPDATE", "DELETE"])

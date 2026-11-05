@@ -396,7 +396,9 @@ export class District {
         this.facing(s, 23.6, zc, () =>
           s < 0
             ? flats(k, { units: 2, floors: 4, shops: shopsFrom(4, 3, 2), landmark: (kk, x, w) => landmarkFront(kk, x, w, "studio") })
-            : flats(k, { units: 2, floors: 4, shops: shopsFrom(4) }),
+            : // The last shop is the Workshop (project builder). Keep the same random picks so the
+              // rest of the street looks exactly as before.
+              flats(k, { units: 2, floors: 4, shops: shopsFrom(4).map((x, i) => (i === 3 ? ("landmark" as const) : x)), landmark: (kk, x, w) => landmarkFront(kk, x, w, "workshop") }),
         );
         this.forecourt(s, z0, z1);
         this.yard(s, 31, 40, z0 + 2, z1 - 2);
@@ -695,7 +697,7 @@ export class District {
 }
 
 /** Glass shopfronts for the portfolio destinations. */
-export function landmarkFront(k: Kit, x: number, w: number, kind: "studio" | "gallery" | "arcade") {
+export function landmarkFront(k: Kit, x: number, w: number, kind: "studio" | "gallery" | "arcade" | "workshop") {
   const b = k.b;
   const h = 2.3;
   const arcade = kind === "arcade";
@@ -710,6 +712,15 @@ export function landmarkFront(k: Kit, x: number, w: number, kind: "studio" | "ga
     b.box(k.emissive("#9fd0ff", 2.4, 1.2, "#111"), 0.7, 0.42, 0.03, x - 1.0, 1.55, -1.85);
     b.box(k.emissive("#c5ed8b", 2.4, 1.2, "#111"), 0.7, 0.42, 0.03, x - 0.1, 1.55, -1.85);
     b.box(k.plastic("#3a6b4f", 0.8), 0.6, 0.9, 0.6, x + 1.4, 0.95, -1.8);
+  } else if (kind === "workshop") {
+    // A drafting table with a glowing blueprint, a phone and a laptop mock-up on the wall.
+    b.box(k.plastic("#8a6a4a", 0.8), 2.4, 0.08, 1.0, x - 0.3, 1.2, -1.5);
+    b.box(k.emissive("#9fd0ff", 1.8, 1, "#123"), 2.0, 0.02, 0.7, x - 0.3, 1.26, -1.5, 0, -0.2);
+    b.box(k.metal("#1d1d1d", 0.5, 0.2), 1.3, 0.85, 0.04, x - 0.9, 2.0, -2.55);
+    b.box(k.emissive("#ff9f6e", 1.6, 0.9, "#eee"), 1.15, 0.7, 0.02, x - 0.9, 2.0, -2.52);
+    b.box(k.metal("#1d1d1d", 0.5, 0.2), 0.42, 0.8, 0.04, x + 0.6, 2.0, -2.55);
+    b.box(k.emissive("#c5ed8b", 1.6, 0.9, "#eee"), 0.34, 0.68, 0.02, x + 0.6, 2.0, -2.52);
+    b.box(k.plastic("#3a6b4f", 0.8), 0.5, 1.1, 0.5, x + 1.5, 1.05, -1.9);
   } else if (kind === "gallery") {
     for (let i = 0; i < 3; i++) {
       b.box(k.metal("#1d1d1d", 0.5, 0.2), 1.05, 0.8, 0.04, x - 1.6 + i * 1.6, 1.8, -2.55);
@@ -727,8 +738,8 @@ export function landmarkFront(k: Kit, x: number, w: number, kind: "studio" | "ga
   for (let i = 0; i <= 3; i++) b.box(alu, 0.06, h, 0.08, x - (w - 0.3) / 2 + (i * (w - 0.3)) / 3, 0.5 + h / 2, 0.06);
   b.box(alu, w - 0.2, 0.08, 0.1, x, 0.5 + h, 0.06);
   b.box(k.concrete("#b4ada0"), w + 0.4, 0.5, 1.8, x, 0.25, 0.9);
-  const label = kind === "studio" ? ["THE STUDIO", "ABOUT ME"] : kind === "gallery" ? ["THE GALLERY", "SELECTED WORK"] : ["PLAY ROOM", "ARCADE • GAMES"];
-  const col = kind === "studio" ? "#c5ed8b" : kind === "gallery" ? "#ffd198" : "#c6b7f3";
+  const label = { studio: ["THE STUDIO", "ABOUT ME"], gallery: ["THE GALLERY", "SELECTED WORK"], arcade: ["PLAY ROOM", "ARCADE • GAMES"], workshop: ["THE WORKSHOP", "BUILD YOURS"] }[kind];
+  const col = { studio: "#c5ed8b", gallery: "#ffd198", arcade: "#c6b7f3", workshop: "#ff9f6e" }[kind];
   const rect = k.signs.add("landmark-" + kind, label, "#0d1512", col, 1024, 220, "neon");
   b.box(k.metal("#1b1f1d", 0.5, 0.3), w - 0.1, 0.52, 0.08, x, 3.08, 0.12);
   b.quad(k.signs_(true), w - 0.3, 0.46, x, 3.08, 0.17, 0, 0, rect);

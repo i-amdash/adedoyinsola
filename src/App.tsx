@@ -25,6 +25,7 @@ import {
   Moon,
   Sunrise,
   Crosshair,
+  PencilRuler,
 } from "lucide-react";
 import type { World } from "./world/World";
 import type { Quality, TimeOfDay } from "./world/Atmosphere";
@@ -43,6 +44,7 @@ import Map from "./Map";
 import Arcade, { type WorldGame } from "./Arcade";
 import Projects from "./Projects";
 import { useGames } from "./game/useGames";
+import { estimate, formatMoney } from "../shared/builder.mjs";
 const initial: Telemetry = {
   x: 3.3,
   z: 86,
@@ -58,6 +60,7 @@ const icons = {
   about: Compass,
   projects: ArrowUpRight,
   arcade: Gamepad2,
+  build: PencilRuler,
   contact: Mail,
 };
 export default function App() {
@@ -378,12 +381,19 @@ export default function App() {
             </span>
           </a>
           <nav className="desktop-nav" aria-label="Portfolio">
-            {destinations.map((d) => (
-              <button key={d.id} onClick={() => setPanel(d.id)}>
-                {d.name}
-                <ArrowUpRight size={12} />
-              </button>
-            ))}
+            {destinations.map((d) =>
+              d.id === "build" ? (
+                <a key={d.id} href="/build" className="nav-build">
+                  {d.name}
+                  <ArrowUpRight size={12} />
+                </a>
+              ) : (
+                <button key={d.id} onClick={() => setPanel(d.id)}>
+                  {d.name}
+                  <ArrowUpRight size={12} />
+                </button>
+              ),
+            )}
           </nav>
           <button className="map-top" aria-label="Explore the map" onClick={() => setPanel("map")}>
             <MapIcon size={16} />
@@ -436,10 +446,10 @@ export default function App() {
             </div>
             <div className="hero-note">
               <span className="tiny-line" />
-              <button onClick={() => setPanel("contact")}>
-                Or bring your idea to life
+              <a href="/build">
+                Or design your project and see the price
                 <ArrowUpRight size={14} />
-              </button>
+              </a>
             </div>
           </section>
         )}
@@ -646,9 +656,9 @@ export default function App() {
             <i />
             {content?.profile.availability || "Available for website & app projects"}
           </span>
-          <button onClick={() => setPanel("contact")}>
+          <a href="/build">
             Let’s bring your vision to life <ArrowUpRight size={13} />
-          </button>
+          </a>
         </footer>
       </div>
       {(telemetry.race === "countdown" || (telemetry.race === "running" && telemetry.elapsed < 0.5)) && !panel && <div className="race-countdown" role="status" aria-live="assertive"><small>AVENUE SPRINT · GET READY</small><strong key={telemetry.race === "countdown" ? telemetry.countdown : "go"}>{telemetry.race === "countdown" ? telemetry.countdown || 3 : "GO!"}</strong><p>W / ↑ to accelerate · A D / ← → to steer</p></div>}
@@ -758,17 +768,42 @@ export default function App() {
                           <span key={s}>{s}</span>
                         ))}
                       </div>
-                      <button
-                        className="primary-button panel-cta"
-                        onClick={() => setPanel("contact")}
-                      >
-                        Bring your idea to life
+                      <a className="primary-button panel-cta" href="/build">
+                        Design your project
                         <ArrowUpRight size={18} />
-                      </button>
+                      </a>
                     </>
                   )}
                   {panel === "projects" && <Projects projects={content.projects} onContact={() => setPanel("contact")} />}
                   {panel === "arcade" && <Arcade games={games} worldAvailable={ready && !worldError} projects={content.projects} onPlay={(g) => void playWorldGame(g)} />}
+                  {panel === "build" && (
+                    <>
+                      <p className="eyebrow">Build yours</p>
+                      <h2>
+                        Design your project.
+                        <br />
+                        <span className="heading-accent">See the price live.</span>
+                      </h2>
+                      <p className="panel-intro">
+                        Choose what you need, from a simple business website to a restaurant app with a POS, rider app and kitchen screen. A live preview and estimate update with every answer, and you can send me the brief when it looks right.
+                      </p>
+                      <ul className="build-teaser">
+                        {(content.builder?.products || []).filter((p) => p.enabled).map((p) => (
+                          <li key={p.id}>
+                            <strong>{p.name}</strong>
+                            <span>{p.tagline}</span>
+                            <small>
+                              From {formatMoney(estimate(content.builder, p.id, {})?.low || p.base)} · {p.weeks[0]}–{p.weeks[1]} weeks
+                            </small>
+                          </li>
+                        ))}
+                      </ul>
+                      <a className="primary-button panel-cta" href="/build">
+                        Open the project builder
+                        <ArrowUpRight size={18} />
+                      </a>
+                    </>
+                  )}
                   {panel === "contact" && (
                     <>
                       <p className="eyebrow">Contact</p>
@@ -812,6 +847,9 @@ export default function App() {
                         {copied ? <Check size={15} /> : <Mail size={15} />}{" "}
                         {copied ? "Email copied" : "Copy email address"}
                       </button>
+                      <a className="text-button build-link" href="/build">
+                        <PencilRuler size={15} /> Prefer a price first? Design your project
+                      </a>
                       <div className="social-links">
                         {content.profile.github && (
                           <a

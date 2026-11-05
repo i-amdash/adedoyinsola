@@ -1,6 +1,7 @@
 import express from "express";
 import { mountUploads } from "./uploads.mjs";
 import { mountPlayers } from "./players.mjs";
+import { mountRequests } from "./requests.mjs";
 import { rateLimit } from "express-rate-limit";
 import { createSessions } from "./sessions.mjs";
 import { cloudResult, rateOptions } from "./cloud.mjs";
@@ -15,6 +16,7 @@ export function createApp({
   trustProxy = false,
   now,
   supabase = null,
+  notify,
 }) {
   const app = express(),
     store = createStore(directory, supabase),
@@ -160,6 +162,7 @@ export function createApp({
     }
   });
   mountPlayers(app, { directory, production, now, supabase, adminAuth: auth });
+  mountRequests(app, { directory, supabase, content: store, adminAuth: auth, ...(notify !== undefined ? { notify } : {}), ...(now ? { now } : {}) });
   app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));
   if (staticDirectory) {
     app.use(express.static(staticDirectory));

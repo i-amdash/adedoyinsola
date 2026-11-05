@@ -4,6 +4,7 @@ import { z } from "zod";
 import { seed } from "./seed.mjs";
 import { cloudResult, cloudFailure } from "./cloud.mjs";
 import { uploadPath } from "./uploads.mjs";
+import { defaultBuilder } from "../shared/builder.mjs";
 const text = z.string().trim().min(1).max(4000);
 const link = z.union([
   z.literal(""),
@@ -11,6 +12,54 @@ const link = z.union([
 ]);
 const staticCover = /^\/project-covers\/[a-z0-9-]+\.(png|jpg|gif|webp)$/;
 const coverImage = z.union([link, z.string().regex(uploadPath), z.string().regex(staticCover)], { error: "Use an uploaded image or an http/https image URL" });
+const slug = z.string().regex(/^[a-z0-9-]+$/).max(40);
+const naira = z.number().int().min(0).max(10_000_000_000);
+const option = z.object({
+  id: slug,
+  label: text.max(140),
+  price: naira,
+  weeks: z.number().min(0).max(52).optional(),
+  monthly: naira.optional(),
+  multiplier: z.number().min(1).max(3).optional(),
+  speed: z.number().min(0.3).max(1).optional(),
+  enabled: z.boolean().optional(),
+});
+const question = z.object({
+  id: slug,
+  label: text.max(200),
+  help: z.string().trim().max(300).optional(),
+  type: z.enum(["single", "multi", "count"]),
+  options: z.array(option).max(30).optional(),
+  min: z.number().int().min(0).max(1000).optional(),
+  max: z.number().int().min(1).max(1000).optional(),
+  included: z.number().int().min(0).max(1000).optional(),
+  unitPrice: naira.optional(),
+  unitWeeks: z.number().min(0).max(10).optional(),
+  unit: z.string().trim().max(40).optional(),
+});
+const step = z.object({ id: slug, title: text.max(80), questions: z.array(question).max(12) });
+export const builderSchema = z.object({
+  usdRate: z.number().positive().max(100000),
+  spread: z.number().min(0).max(0.5),
+  products: z
+    .array(
+      z.object({
+        id: slug,
+        kind: z.enum(["web", "mobile"]),
+        name: text.max(80),
+        tagline: text.max(200),
+        base: naira,
+        weeks: z.tuple([z.number().min(0).max(104), z.number().min(0).max(104)]),
+        includes: z.array(text.max(80)).max(10),
+        enabled: z.boolean(),
+        steps: z.array(step).max(6),
+      }),
+    )
+    .min(1)
+    .max(8)
+    .refine((v) => new Set(v.map((p) => p.id)).size === v.length, "Product IDs must be unique"),
+  finishing: z.array(step).max(4),
+});
 export const contentSchema = z.object({
   revision: z.number().int().positive(),
   profile: z.object({
@@ -56,6 +105,7 @@ export const contentSchema = z.object({
   services: z
     .array(z.object({ title: text.max(100), description: text }))
     .max(20),
+  builder: builderSchema.default(() => structuredClone(defaultBuilder)),
 });
 /**
  * Rebuild a stored document that no longer matches the schema (an older format, or an edit
@@ -83,6 +133,7 @@ export function repairContent(raw) {
     projects: projects.length ? projects : structuredClone(seed.projects),
     world: pick("world"),
     services: pick("services"),
+    builder: pick("builder"),
   };
   return { content: contentSchema.parse(content), repaired: true };
 }

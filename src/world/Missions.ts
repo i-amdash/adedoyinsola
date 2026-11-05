@@ -71,6 +71,7 @@ const delivered: Record<Destination, string> = {
   about: "Delivered to The Studio, where every project starts with your brief.",
   projects: "Delivered to The Gallery. Twelve projects are on show inside.",
   arcade: "Delivered to The Arcade. Seven games are waiting.",
+  build: "Delivered to The Workshop, where you can design and price your own project.",
   contact: "Delivered to The Courtyard, the best place to say hello.",
 };
 const dest = (id: Destination) => destinations.find((d) => d.id === id)!;
